@@ -6,7 +6,6 @@ A production-ready platform for uploading, browsing, and downloading University 
 
 - **Frontend**: React + Vite, Zustand for state management, React Query for server state, Tailwind CSS
 - **Backend**: FastAPI + SQLAlchemy, PostgreSQL database, S3-compatible file storage
-- **Infrastructure**: Docker, CI/CD with GitHub Actions, monitoring with Sentry
 
 ## Project Structure
 
