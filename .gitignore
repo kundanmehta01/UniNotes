@@ -377,6 +377,13 @@ Thumbs.db
 /backend/uninoteshub.db
 /backend/app.db
 
+# Backend documentation files
+/backend/*.md
+/backend/docs/
+/backend/EMAIL_PROVIDER_SETUP.md
+/backend/OTP_MIGRATION_COMPLETE.md
+/backend/OTP_SYSTEM_STATUS.md
+
 # Frontend specific ignores (additional to existing)
 /frontend/node_modules/
 /frontend/dist/
