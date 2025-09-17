@@ -19,7 +19,7 @@ passlib[argon2]==1.7.4
 python-multipart==0.0.6
 argon2-cffi==23.1.0
 
-# AWS S3 and file handling
+# AWS S3, SES and file handling
 boto3==1.34.0
 botocore==1.34.0
 python-magic==0.4.27

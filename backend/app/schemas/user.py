@@ -16,16 +16,7 @@ class UserBase(BaseModel):
     avatar_url: Optional[str] = Field(None, max_length=500)
 
 
-class UserCreate(UserBase):
-    """Schema for user registration."""
-    password: str = Field(..., min_length=8, max_length=128)
-    
-    @validator("password")
-    def validate_password(cls, v):
-        """Basic password validation - detailed validation is in security service."""
-        if len(v) < 8:
-            raise ValueError("Password must be at least 8 characters long")
-        return v
+# UserCreate schema removed - registration is now handled via OTP
 
 
 class UserUpdate(BaseModel):
@@ -40,7 +31,6 @@ class UserInDB(UserBase):
     """Schema for user data as stored in database."""
     id: uuid.UUID
     role: UserRole
-    is_email_verified: bool
     created_at: datetime
     last_login_at: Optional[datetime]
     
@@ -60,36 +50,10 @@ class UserWithStats(User):
     bookmark_count: int = 0
 
 
-class UserLogin(BaseModel):
-    """Schema for user login."""
-    email: EmailStr
-    password: str = Field(..., min_length=1)
+# UserLogin schema removed - login is now handled via OTP
 
 
-class UserPasswordReset(BaseModel):
-    """Schema for password reset request."""
-    email: EmailStr
-
-
-class UserPasswordResetConfirm(BaseModel):
-    """Schema for password reset confirmation."""
-    token: str
-    new_password: str = Field(..., min_length=8, max_length=128)
-    
-    @validator("new_password")
-    def validate_password(cls, v):
-        """Validate password strength."""
-        if len(v) < 8:
-            raise ValueError("Password must be at least 8 characters long")
-        
-        has_upper = any(c.isupper() for c in v)
-        has_lower = any(c.islower() for c in v)
-        has_digit = any(c.isdigit() for c in v)
-        
-        if not (has_upper and has_lower and has_digit):
-            raise ValueError("Password must contain at least one uppercase letter, one lowercase letter, and one digit")
-        
-        return v
+# Password reset schemas removed - OTP authentication doesn't require password reset
 
 
 class EmailVerification(BaseModel):

@@ -22,14 +22,29 @@ class NotificationService:
     ) -> Notification:
         """Create a new notification for a user."""
         
+        # Safely convert related IDs to UUID format or None
+        def safe_uuid_convert(uuid_str: Optional[str]) -> Optional[str]:
+            if uuid_str is None:
+                return None
+            try:
+                # Try to parse and reformat as standard UUID string
+                import uuid as uuid_lib
+                if isinstance(uuid_str, str):
+                    parsed_uuid = uuid_lib.UUID(uuid_str)
+                    return str(parsed_uuid)
+                return str(uuid_str)
+            except (ValueError, AttributeError):
+                # If parsing fails, return None instead of causing error
+                return None
+        
         notification = Notification(
             id=uuid.uuid4(),
             user_id=user_id,
             title=title,
             message=message,
             notification_type=notification_type,
-            related_paper_id=related_paper_id,
-            related_report_id=related_report_id
+            related_paper_id=safe_uuid_convert(related_paper_id),
+            related_report_id=safe_uuid_convert(related_report_id)
         )
         
         self.db.add(notification)

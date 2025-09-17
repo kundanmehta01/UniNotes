@@ -23,7 +23,7 @@ async def get_home_stats(db: Session = Depends(get_db)):
     total_papers = db.query(Paper).filter(Paper.status == PaperStatus.APPROVED).count()
     total_notes = db.query(Note).filter(Note.status == NoteStatus.APPROVED).count()
     total_universities = db.query(University).count()
-    total_users = db.query(User).filter(User.is_email_verified == True).count()
+    total_users = db.query(User).count()  # All users are valid with OTP authentication
     
     # Total downloads = paper downloads + note downloads
     total_paper_downloads = db.query(Download).count()

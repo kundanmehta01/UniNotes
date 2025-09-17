@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
 from app.db.models import User, UserRole, AuditLog
-from app.schemas.user import UserCreate, UserUpdate, Token
+from app.schemas.user import UserUpdate, Token
 from app.services.security import (
     hash_password, 
     verify_password, 
@@ -37,134 +37,64 @@ class AuthService:
     def __init__(self, db: Session):
         self.db = db
     
-    async def register_user(
+    # DEPRECATED: User registration is now handled via OTP authentication
+    # This method is kept for backward compatibility but should not be used
+    async def register_user_deprecated(
         self, 
-        user_data: UserCreate,
+        email: str,
+        first_name: str = None,
+        last_name: str = None,
+        bio: str = None,
         ip_address: str = "unknown",
         user_agent: str = ""
-    ) -> Tuple[User, str]:
-        """Register a new user and send verification email."""
+    ) -> User:
+        """DEPRECATED: User registration is now handled via OTP authentication."""
         
-        # Validate password strength
-        is_valid, errors = validate_password_strength(user_data.password)
-        if not is_valid:
-            raise ValidationError(
-                detail="Password does not meet security requirements",
-                details={"password_errors": errors}
-            )
-        
-        # Check if user already exists
-        existing_user = self.db.query(User).filter(User.email == user_data.email).first()
-        if existing_user:
-            if existing_user.is_email_verified:
-                # User exists and is verified - can't re-register
-                raise UserAlreadyExistsError(
-                    detail="User with this email already exists and is verified",
-                    details={"email": user_data.email}
-                )
-            else:
-                # User exists but is unverified - allow update and resend verification
-                logger.info(f"Updating unverified user registration for {user_data.email}")
-                
-                # Update user data (hash password first)
-                hashed_password = hash_password(user_data.password)
-                existing_user.password_hash = hashed_password
-                existing_user.first_name = user_data.first_name
-                existing_user.last_name = user_data.last_name
-                existing_user.bio = user_data.bio
-                existing_user.role = UserRole.ADMIN if user_data.email == settings.ADMIN_EMAIL else UserRole.STUDENT
-                
-                self.db.commit()
-                self.db.refresh(existing_user)
-                
-                # Create new verification token
-                verification_token = create_email_verification_token(existing_user.email)
-                
-                # Log re-registration
-                await self._log_auth_event(
-                    user_id=existing_user.id,
-                    action="user_reregistered",
-                    ip_address=ip_address,
-                    user_agent=user_agent,
-                    metadata={"email": existing_user.email, "role": existing_user.role.value}
-                )
-                
-                # Send verification email
-                email_sent = await email_service.send_verification_email(
-                    existing_user.email,
-                    verification_token
-                )
-                
-                if email_sent:
-                    logger.info(f"Verification email sent to {existing_user.email}")
-                else:
-                    logger.error(f"Failed to send verification email to {existing_user.email}")
-                
-                return existing_user, verification_token
-        
+        # Create user without password (OTP-based auth)
         try:
-            # Hash password
-            hashed_password = hash_password(user_data.password)
-            
-            # Create user
             new_user = User(
-                email=user_data.email,
-                password_hash=hashed_password,
-                first_name=user_data.first_name,
-                last_name=user_data.last_name,
-                bio=user_data.bio,
-                role=UserRole.ADMIN if user_data.email == settings.ADMIN_EMAIL else UserRole.STUDENT,
-                is_email_verified=False,
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+                bio=bio,
+                role=UserRole.ADMIN if email == settings.ADMIN_EMAIL else UserRole.STUDENT,
             )
             
             self.db.add(new_user)
             self.db.commit()
             self.db.refresh(new_user)
             
-            # Create email verification token
-            verification_token = create_email_verification_token(new_user.email)
-            
             # Log registration
             await self._log_auth_event(
                 user_id=new_user.id,
-                action="user_registered",
+                action="user_registered_otp",
                 ip_address=ip_address,
                 user_agent=user_agent,
                 metadata={"email": new_user.email, "role": new_user.role.value}
             )
             
-            # Send verification email (async, don't wait)
-            try:
-                await email_service.send_verification_email(
-                    new_user.email,
-                    verification_token
-                )
-                logger.info(f"Verification email sent to {new_user.email}")
-            except Exception as e:
-                logger.error(f"Failed to send verification email to {new_user.email}: {e}")
-                # Don't fail registration if email fails
-            
-            return new_user, verification_token
+            return new_user
             
         except IntegrityError:
             self.db.rollback()
             raise UserAlreadyExistsError(
                 detail="User with this email already exists",
-                details={"email": user_data.email}
+                details={"email": email}
             )
         except Exception as e:
             self.db.rollback()
-            logger.error(f"Failed to register user {user_data.email}: {e}")
+            logger.error(f"Failed to register user {email}: {e}")
             raise
     
-    async def login_user(
+    # DEPRECATED: Password-based login replaced with OTP authentication
+    async def login_user_deprecated(
         self,
         email: str,
         password: str,
         ip_address: str = "unknown",
         user_agent: str = ""
     ) -> dict:
-        """Authenticate user and return tokens with user data."""
+        """DEPRECATED: Password-based login replaced with OTP authentication."""
         
         # Find user
         user = self.db.query(User).filter(User.email == email).first()
@@ -177,27 +107,11 @@ class AuthService:
             )
             raise AuthenticationError(detail="Invalid email or password")
         
-        # Verify password
-        if not verify_password(password, user.password_hash):
-            await self._log_auth_event(
-                user_id=user.id,
-                action="login_failed",
-                ip_address=ip_address,
-                user_agent=user_agent,
-                metadata={"email": email, "reason": "invalid_password"}
-            )
-            raise AuthenticationError(detail="Invalid email or password")
-        
-        # Check if email is verified
-        if not user.is_email_verified:
-            await self._log_auth_event(
-                user_id=user.id,
-                action="login_failed",
-                ip_address=ip_address,
-                user_agent=user_agent,
-                metadata={"email": email, "reason": "email_not_verified"}
-            )
-            raise EmailNotVerifiedError(detail="Please verify your email address before logging in")
+        # NOTE: This method is deprecated and should not be used
+        # Always return error message indicating OTP authentication should be used
+        raise AuthenticationError(
+            detail="Password-based login has been replaced with OTP authentication. Please use /auth/send-otp to receive a login code."
+        )
         
         # Update last login
         user.last_login_at = datetime.utcnow()

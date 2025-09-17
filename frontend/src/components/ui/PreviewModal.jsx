@@ -3,6 +3,7 @@ import { X, Download, ExternalLink, AlertCircle, Eye } from 'lucide-react';
 import { Modal } from './Modal';
 import Button from './Button';
 import { Loading } from './Loading';
+import PDFViewer from './PDFViewer';
 import useAuthStore from '../../stores/authStore';
 import { cn } from '../../lib/utils';
 import toast from 'react-hot-toast';
@@ -10,21 +11,27 @@ import toast from 'react-hot-toast';
 const PreviewModal = ({ 
   isOpen, 
   onClose, 
-  item, 
+  item,          // Legacy prop name
+  file,          // New prop name
   itemType = 'paper', // 'paper' or 'note'
   onDownload = null,
   showDownloadButton = true,
+  disableDownload = false,
   className 
 }) => {
+  // Support both prop names for backward compatibility
+  const fileData = file || item;
+  
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [isSupported, setIsSupported] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
   const { user } = useAuthStore();
 
   // Generate preview URL when modal opens
   useEffect(() => {
-    if (isOpen && item?.id) {
+    if (isOpen && fileData?.id) {
       generatePreviewUrl();
     } else {
       // Clean up URL when modal closes
@@ -32,6 +39,8 @@ const PreviewModal = ({
         URL.revokeObjectURL(previewUrl);
         setPreviewUrl(null);
       }
+      // Reset retry count when modal closes
+      setRetryCount(0);
     }
 
     return () => {
@@ -39,39 +48,43 @@ const PreviewModal = ({
         URL.revokeObjectURL(previewUrl);
       }
     };
-  }, [isOpen, item?.id]);
+  }, [isOpen, fileData?.id]);
 
   const generatePreviewUrl = async () => {
-    if (!item?.id) return;
+    if (!fileData?.id) return;
+
 
     setIsLoading(true);
     setError(null);
 
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
     
     // Use storage_key directly if available, otherwise use the ID-based endpoint
     let endpoint;
-    if (item.storage_key) {
-      endpoint = `${baseUrl}/storage/preview/${item.storage_key}`;
+    if (fileData.storage_key) {
+      endpoint = `${baseUrl}/storage/preview/${fileData.storage_key}`;
     } else {
-      endpoint = `${baseUrl}/storage/preview/${itemType}/${item.id}`;
+      endpoint = `${baseUrl}/storage/preview/${itemType}/${fileData.id}`;
     }
     
-    // For admin users, add token to URL for browser access
+    // For all authenticated users, add token to URL for browser access
     const accessToken = localStorage.getItem('access_token');
-    if (accessToken && user?.role === 'admin') {
+    if (accessToken) {
       const separator = endpoint.includes('?') ? '&' : '?';
       endpoint = `${endpoint}${separator}token=${encodeURIComponent(accessToken)}`;
     }
 
     try {
-      // For PDFs, skip the pre-fetch and use the endpoint directly to avoid iframe issues
-      const fileExtension = item.original_filename?.split('.').pop()?.toLowerCase() || '';
+      // For PDFs, we'll show the preview interface with buttons
+      const fileExtension = fileData.original_filename?.split('.').pop()?.toLowerCase() || '';
       
-      if (fileExtension === 'pdf' || item.mime_type?.includes('pdf')) {
-        // PDF files - use endpoint URL directly for iframe
+      // Check if it's a PDF file
+      const isPdf = fileExtension === 'pdf' || fileData.mime_type?.includes('pdf') || fileData.mime_type === 'application/pdf';
+      
+      if (isPdf) {
+        // PDF files - provide download and external view options
         setIsSupported(true);
-        setPreviewUrl(endpoint);
+        setPreviewUrl(endpoint); // Store the endpoint for external viewing
         setIsLoading(false);
         return;
       }
@@ -116,7 +129,7 @@ const PreviewModal = ({
         error: err,
         message: err.message,
         endpoint,
-        itemId: item?.id,
+        itemId: fileData?.id,
         itemType
       });
       
@@ -141,11 +154,18 @@ const PreviewModal = ({
 
   const handleDownload = () => {
     if (onDownload && typeof onDownload === 'function') {
-      onDownload(item);
+      onDownload(fileData);
     } else {
       // Fallback download logic
-      const downloadUrl = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/storage/download/${item.storage_key}`;
+      const downloadUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/storage/download/${fileData.storage_key}`;
       window.open(downloadUrl, '_blank');
+    }
+  };
+  
+  const handleRetry = () => {
+    if (retryCount < 3) {
+      setRetryCount(prev => prev + 1);
+      generatePreviewUrl();
     }
   };
 
@@ -173,7 +193,7 @@ const PreviewModal = ({
     }
   };
 
-  if (!isOpen || !item) return null;
+  if (!isOpen || !fileData) return null;
 
   return (
     <Modal
@@ -186,24 +206,24 @@ const PreviewModal = ({
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center space-x-3 flex-1 min-w-0">
             <span className="text-2xl">
-              {getFileIcon(item.original_filename)}
+              {getFileIcon(fileData.original_filename)}
             </span>
             <div className="min-w-0 flex-1">
               <h2 className="text-lg font-semibold text-gray-900 truncate">
-                {item.title || item.original_filename}
+                {fileData.title || fileData.original_filename}
               </h2>
               <div className="flex items-center space-x-4 mt-1 text-sm text-gray-500">
                 <span>
-                  {item.original_filename}
+                  {fileData.original_filename}
                 </span>
-                {item.file_size && (
+                {fileData.file_size && (
                   <span>
-                    {(item.file_size / 1024 / 1024).toFixed(2)} MB
+                    {(fileData.file_size / 1024 / 1024).toFixed(2)} MB
                   </span>
                 )}
-                {item.university_name && (
+                {fileData.university_name && (
                   <span>
-                    {item.university_name}
+                    {fileData.university_name}
                   </span>
                 )}
               </div>
@@ -267,57 +287,45 @@ const PreviewModal = ({
                 <p className="text-sm text-gray-600 mb-4">
                   {error}
                 </p>
-                {showDownloadButton && (
-                  <Button
-                    onClick={handleDownload}
-                    className="bg-blue-600 text-white hover:bg-blue-700"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Download File
-                  </Button>
-                )}
+                <div className="flex gap-2 justify-center">
+                  {error.includes('Cannot connect') && retryCount < 3 && (
+                    <Button
+                      onClick={handleRetry}
+                      variant="outline"
+                      className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                    >
+                      Try Again ({3 - retryCount} left)
+                    </Button>
+                  )}
+                  {showDownloadButton && (
+                    <Button
+                      onClick={handleDownload}
+                      className="bg-blue-600 text-white hover:bg-blue-700"
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Download File
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           )}
 
           {!isLoading && !error && previewUrl && isSupported && (
             <div className="w-full h-full">
-              {item.original_filename?.toLowerCase().endsWith('.pdf') ? (
-                <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 p-8">
-                  <div className="text-center max-w-md">
-                    <div className="text-6xl mb-4">📄</div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">
-                      PDF Preview
-                    </h3>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Chrome blocks PDF previews in popups for security. Use the buttons below to view the file.
-                    </p>
-                    <div className="flex gap-2 justify-center">
-                      <Button
-                        onClick={handleExternalView}
-                        className="bg-blue-600 text-white hover:bg-blue-700"
-                      >
-                        <ExternalLink className="w-4 h-4 mr-2" />
-                        Open PDF
-                      </Button>
-                      {showDownloadButton && (
-                        <Button
-                          onClick={handleDownload}
-                          variant="outline"
-                          className="text-blue-600 border-blue-600 hover:bg-blue-50"
-                        >
-                          <Download className="w-4 h-4 mr-2" />
-                          Download
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
+              {fileData.original_filename?.toLowerCase().endsWith('.pdf') || fileData.mime_type?.includes('pdf') ? (
+                <PDFViewer
+                  fileUrl={previewUrl}
+                  fileName={fileData.original_filename}
+                  onDownload={showDownloadButton ? handleDownload : null}
+                  onExternalView={handleExternalView}
+                  showDownloadButton={showDownloadButton}
+                />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-gray-50">
                   <img
                     src={previewUrl}
-                    alt={item.title || item.original_filename}
+                    alt={fileData.title || fileData.original_filename}
                     className="max-w-full max-h-full object-contain"
                   />
                 </div>
@@ -350,30 +358,30 @@ const PreviewModal = ({
         </div>
 
         {/* Footer with additional info */}
-        {item && (
+        {fileData && (
           <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
             <div className="flex items-center justify-between text-sm text-gray-600">
               <div className="flex items-center space-x-4">
-                {item.subject_name && (
+                {fileData.subject_name && (
                   <span className="inline-flex items-center px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-                    {item.subject_name}
+                    {fileData.subject_name}
                   </span>
                 )}
-                {item.exam_year && (
-                  <span>Year: {item.exam_year}</span>
+                {fileData.exam_year && (
+                  <span>Year: {fileData.exam_year}</span>
                 )}
-                {item.semester_name && (
-                  <span>Semester: {item.semester_name}</span>
+                {fileData.semester_name && (
+                  <span>Semester: {fileData.semester_name}</span>
                 )}
               </div>
               
               <div className="flex items-center space-x-4">
-                {item.uploader_name && (
-                  <span>Uploaded by: {item.uploader_name}</span>
+                {fileData.uploader_name && (
+                  <span>Uploaded by: {fileData.uploader_name}</span>
                 )}
-                {item.created_at && (
+                {fileData.created_at && (
                   <span>
-                    {new Date(item.created_at).toLocaleDateString()}
+                    {new Date(fileData.created_at).toLocaleDateString()}
                   </span>
                 )}
               </div>

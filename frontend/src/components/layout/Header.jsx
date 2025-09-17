@@ -41,18 +41,14 @@ const Header = () => {
   ];
 
   const userNavigation = [
-    { name: 'Overview', href: '/dashboard' },
-    { name: 'My Papers', href: '/my-papers' },
-    { name: 'My Notes', href: '/my-notes' },
+    { name: 'Dashboard', href: '/dashboard' },
     { name: 'Saved Items', href: '/bookmarks' },
-    { name: 'Recent Activity', href: '/activity' },
-    { name: 'Settings', href: '/profile' },
+    { name: 'Profile', href: '/profile' },
   ];
 
   if (user?.role === 'admin' || user?.role === 'moderator') {
     userNavigation.push(
-      { name: 'Admin Dashboard', href: '/admin' },
-      { name: 'Moderate Papers', href: '/admin/papers' }
+      { name: 'Admin Dashboard', href: '/admin' }
     );
   }
 
@@ -146,7 +142,10 @@ const Header = () => {
                   >
                     <Avatar user={user} size="sm" />
                     <span className="hidden md:block text-gray-700">
-                      {user?.full_name || user?.email}
+                      {user?.first_name && user?.last_name 
+                        ? `${user.first_name} ${user.last_name}` 
+                        : user?.full_name || user?.email
+                      }
                     </span>
                     <svg
                       className={cn(
@@ -192,14 +191,9 @@ const Header = () => {
               </>
             ) : (
               <div className="hidden md:flex items-center space-x-3">
-                <Link to="/login">
-                  <Button variant="outline" size="sm" className="border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white px-4 py-2 rounded-full">
-                    Sign in
-                  </Button>
-                </Link>
-                <Link to="/register">
+                <Link to="/auth">
                   <Button size="sm" className="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-full">
-                    Sign up
+                    Sign in / Sign up
                   </Button>
                 </Link>
               </div>
@@ -314,15 +308,10 @@ const Header = () => {
               ) : (
                 <>
                   <hr className="my-2" />
-                  <div className="px-3 py-2 space-y-2 ">
-                    <Link to="/login" onClick={() => setIsMobileMenuOpen(false)}>
-                      <Button variant="outline" size="sm" className="w-full border-2 mb-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white px-4 py-2 rounded-full">
-                        Sign in
-                      </Button>
-                    </Link>
-                    <Link to="/register" onClick={() => setIsMobileMenuOpen(false)}>
+                  <div className="px-3 py-2">
+                    <Link to="/auth" onClick={() => setIsMobileMenuOpen(false)}>
                       <Button size="sm" className="w-full bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-full">
-                        Sign up
+                        Sign in / Sign up
                       </Button>
                     </Link>
                   </div>

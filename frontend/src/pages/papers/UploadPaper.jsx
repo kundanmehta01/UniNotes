@@ -283,24 +283,6 @@ const UploadPaper = () => {
     }
   };
 
-  if (!user?.is_email_verified) {
-    return (
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
-        <Alert>
-          <AlertDescription>
-            Please verify your email address before uploading papers.
-            <Button
-              variant="link"
-              className="p-0 ml-2 h-auto"
-              onClick={() => navigate('/auth/verify-email')}
-            >
-              Verify Email
-            </Button>
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">

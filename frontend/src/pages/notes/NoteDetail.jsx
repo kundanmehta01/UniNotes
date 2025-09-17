@@ -70,7 +70,7 @@ const NoteDetail = () => {
   const handleDownload = async () => {
     if (!isAuthenticated) {
       toast.error('Please login to download notes');
-      navigate('/login');
+      navigate('/auth');
       return;
     }
 
@@ -84,7 +84,7 @@ const NoteDetail = () => {
   const handleBookmark = async () => {
     if (!isAuthenticated) {
       toast.error('Please login to bookmark notes');
-      navigate('/login');
+      navigate('/auth');
       return;
     }
 
@@ -99,7 +99,7 @@ const NoteDetail = () => {
   const handleRating = async (rating) => {
     if (!isAuthenticated) {
       toast.error('Please login to rate notes');
-      navigate('/login');
+      navigate('/auth');
       return;
     }
 

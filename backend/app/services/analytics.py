@@ -25,8 +25,8 @@ class AnalyticsService:
         end_date = datetime.utcnow()
         start_date = end_date - timedelta(days=days)
         
-        # Active users (use verified users as proxy)
-        active_users = self.db.query(User).filter(User.is_email_verified == True).count()
+        # Active users (all users are valid with OTP authentication)
+        active_users = self.db.query(User).count()
         
         # New registrations
         new_registrations = self.db.query(User).filter(
@@ -92,7 +92,7 @@ class AnalyticsService:
         total_papers = self.db.query(Paper).count()
         total_notes = self.db.query(Note).count()
         total_universities = self.db.query(University).count()
-        active_users = self.db.query(User).filter(User.is_email_verified == True).count()
+        active_users = self.db.query(User).count()  # All users are active with OTP auth
         
         # Paper status counts
         approved_papers = self.db.query(Paper).filter(Paper.status == PaperStatus.APPROVED).count()
@@ -398,7 +398,7 @@ class AnalyticsService:
         start_date = end_date - timedelta(days=days)
         
         total_users = self.db.query(User).count()
-        active_users = self.db.query(User).filter(User.is_email_verified == True).count()
+        active_users = self.db.query(User).count()  # All users are active with OTP auth
         
         new_users = self.db.query(User).filter(
             User.created_at >= start_date
@@ -445,7 +445,7 @@ class AnalyticsService:
             Paper.status == PaperStatus.APPROVED
         ).count()
         
-        active_users = self.db.query(User).filter(User.is_email_verified == True).count()
+        active_users = self.db.query(User).count()  # All users are active with OTP auth
         
         # Simulate download stats
         total_downloads = total_papers * 8  # Average downloads per paper

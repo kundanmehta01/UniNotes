@@ -6,7 +6,7 @@ import logging
 
 from app.db.models import User, UserRole
 from app.db.models import Paper, PaperStatus  # AuditLog might not exist yet
-from app.schemas.user import UserUpdate, UserCreate
+from app.schemas.user import UserUpdate
 from app.schemas.admin import (
     UserStats, SystemStats, SystemConfig, 
     UserActivityLog, BulkUserAction, AdminUserUpdate
@@ -58,7 +58,7 @@ class AdminService:
         if role:
             query = query.filter(User.role == role)
         if is_active is not None:
-            query = query.filter(User.is_email_verified == is_active)  # Using is_email_verified as proxy for active
+            query = query.filter(User.is_active == is_active)
         if search:
             search_term = f"%{search}%"
             query = query.filter(
@@ -113,9 +113,8 @@ class AdminService:
         if "password" in update_data:
             update_data["hashed_password"] = get_password_hash(update_data.pop("password"))
         
-        # Map is_active from schema to is_email_verified in the database model
-        if "is_active" in update_data:
-            update_data["is_email_verified"] = update_data.pop("is_active")
+        # is_active field can be updated to control login access
+        # This is the main field for enabling/disabling user accounts
         
         for field, value in update_data.items():
             setattr(user, field, value)
@@ -137,37 +136,16 @@ class AdminService:
         
         return user
 
-    def create_user(self, user_create: UserCreate, admin_user: User) -> User:
-        """Create a new user (admin only)."""
+    # DEPRECATED: User creation is now handled via OTP authentication
+    def create_user_deprecated(self, email: str, first_name: str = None, last_name: str = None, admin_user: User = None) -> dict:
+        """DEPRECATED: User creation is now handled via OTP authentication."""
         
-        # Check if user already exists
-        existing_user = self.db.query(User).filter(
-            User.email == user_create.email
-        ).first()
-        
-        if existing_user:
-            raise ValidationException("User with this email already exists")
-        
-        # Create user
-        user_data = user_create.dict()
-        user_data["password_hash"] = get_password_hash(user_data.pop("password"))
-        user_data["is_email_verified"] = True  # Admin-created users are pre-verified
-        
-        user = User(**user_data)
-        self.db.add(user)
-        self.db.commit()
-        self.db.refresh(user)
-        
-        audit_logger.info(
-            f"Admin {admin_user.email} created user {user.email}",
-            extra={
-                "admin_id": admin_user.id,
-                "target_user_id": user.id,
-                "action": "user_create"
-            }
-        )
-        
-        return user
+        return {
+            "message": "User creation through admin panel has been replaced with OTP authentication. Users can register by using /auth/send-otp.",
+            "status": "deprecated",
+            "alternative": "/auth/send-otp",
+            "email": email
+        }
 
     def delete_user(self, user_id: str, admin_user: User) -> bool:
         """Delete user (admin only)."""
@@ -233,13 +211,12 @@ class AdminService:
         for user in users:
             try:
                 if action.action == "activate":
-                    user.is_email_verified = True  # Use is_email_verified as proxy
+                    user.is_active = True
                 elif action.action == "deactivate":
-                    user.is_email_verified = False  # Use is_email_verified as proxy
-                elif action.action == "verify":
-                    user.is_email_verified = True
-                elif action.action == "unverify":
-                    user.is_email_verified = False
+                    user.is_active = False
+                elif action.action in ["verify", "unverify"]:
+                    # These actions are no longer applicable with OTP authentication
+                    pass
                 elif action.action == "make_moderator":
                     # UserRole.MODERATOR doesn't exist, skip
                     pass
@@ -285,9 +262,9 @@ class AdminService:
         """Get user statistics."""
         
         total_users = self.db.query(User).count()
-        # Use is_email_verified as proxy for active users
-        active_users = self.db.query(User).filter(User.is_email_verified == True).count()
-        verified_users = self.db.query(User).filter(User.is_email_verified == True).count()
+        # Active users are those with is_active=True, verified users are all OTP users
+        active_users = self.db.query(User).filter(User.is_active == True).count()
+        verified_users = total_users  # All OTP users are considered verified
         
         # Users by role
         role_stats = self.db.query(

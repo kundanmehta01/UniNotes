@@ -1,17 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Clock, Upload, Bookmark, Download, Star } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, Button, PaperCard, Loading } from '../components';
+import { Card, CardHeader, CardTitle, CardContent, Button, Loading } from '../components';
 import useAuthStore from '../stores/authStore';
-import usePapersStore from '../stores/papersStore';
 import { activityAPI, authAPI } from '../lib/api';
 import DashboardSidebar from '../components/ui/DashboardSidebar';
 import DashboardStats from '../components/ui/DashboardStats';
 
 const Dashboard = () => {
   const { user } = useAuthStore();
-  const { papers, fetchPapers, isLoading } = usePapersStore();
-  const [recentPapers, setRecentPapers] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [recentActivities, setRecentActivities] = useState([]);
   const [activitiesLoading, setActivitiesLoading] = useState(true);
@@ -25,7 +22,7 @@ const Dashboard = () => {
 
   // Fetch dashboard stats
   const fetchDashboardStats = async () => {
-    if (!user || !user.is_email_verified) {
+    if (!user) {
       setStatsLoading(false);
       return;
     }
@@ -53,7 +50,7 @@ const Dashboard = () => {
 
   // Fetch dynamic recent activities
   const fetchRecentActivities = async () => {
-    if (!user || !user.is_email_verified) {
+    if (!user) {
       setActivitiesLoading(false);
       return;
     }
@@ -142,29 +139,6 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
-    // Fetch recent papers with status filter to exclude rejected papers
-    fetchPapers({ 
-      limit: 6, 
-      status: 'APPROVED' // Only fetch approved papers (uppercase as stored in DB)
-    }).then((response) => {
-      // Handle different response formats
-      let papers = [];
-      if (response && Array.isArray(response)) {
-        papers = response.slice(0, 6);
-      } else if (response && response.papers && Array.isArray(response.papers)) {
-        papers = response.papers.slice(0, 6);
-      } else if (response && response.items && Array.isArray(response.items)) {
-        papers = response.items.slice(0, 6);
-      }
-      
-      // Additional filter to ensure no rejected papers slip through
-      papers = papers.filter(paper => paper.status !== 'REJECTED');
-      setRecentPapers(papers);
-    }).catch((error) => {
-      console.error('Failed to fetch recent papers:', error);
-      setRecentPapers([]);
-    });
-
     // Fetch recent activities and dashboard stats
     fetchRecentActivities();
     fetchDashboardStats();
@@ -302,78 +276,29 @@ const Dashboard = () => {
           {/* Stats Cards */}
           <DashboardStats stats={stats} isLoading={statsLoading} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Quick Actions */}
-        <div className="lg:col-span-1">
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {quickActions.map((action, index) => (
-                <Link key={index} to={action.href}>
-                  <div className="flex items-center p-4 rounded-lg border hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer">
-                    <div className={`p-2 ${action.color} text-white rounded-lg mr-4`}>
-                      {action.icon}
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-medium text-gray-900">{action.title}</h3>
-                      <p className="text-sm text-gray-500">{action.description}</p>
-                    </div>
-                    <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+      {/* Quick Actions in Card Format */}
+      <div className="mb-8">
+        <h2 className="text-xl font-semibold text-gray-900 mb-6">Quick Actions</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {quickActions.map((action, index) => (
+            <Link key={index} to={action.href} className="group">
+              <Card className="h-full hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-0 shadow-md">
+                <CardContent className="p-6 text-center">
+                  <div className={`mx-auto w-12 h-12 ${action.color} text-white rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300`}>
+                    {action.icon}
+                  </div>
+                  <h3 className="font-semibold text-gray-900 mb-2 text-lg">{action.title}</h3>
+                  <p className="text-sm text-gray-600 leading-relaxed">{action.description}</p>
+                  <div className="mt-4 inline-flex items-center text-sm font-medium text-blue-600 group-hover:text-blue-700">
+                    Get Started
+                    <svg className="ml-1 w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
                     </svg>
                   </div>
-                </Link>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Recent Papers */}
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Recent Papers</CardTitle>
-              <Link to="/papers">
-                <Button variant="ghost" size="sm">
-                  View All
-                  <svg className="ml-2 w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                  </svg>
-                </Button>
-              </Link>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex justify-center py-8">
-                  <Loading text="Loading recent papers..." />
-                </div>
-              ) : recentPapers.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {recentPapers.map((paper) => (
-                    <PaperCard
-                      key={paper.id}
-                      paper={paper}
-                      showActions={true}
-                      showBookmark={true}
-                      className="h-full"
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  <p className="mt-2 text-sm text-gray-500">No papers available yet.</p>
-                  <Link to="/papers">
-                    <Button className="mt-4">Browse Papers</Button>
-                  </Link>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
         </div>
       </div>
 

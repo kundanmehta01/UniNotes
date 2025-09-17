@@ -33,13 +33,25 @@ class Settings(BaseSettings):
     S3_SECRET_KEY: str = Field(default="minioadmin", env="S3_SECRET_KEY")
     S3_REGION: str = Field(default="us-east-1", env="S3_REGION")
     
-    # Email
+    # Email Configuration - supports both SMTP and AWS SES
+    EMAIL_PROVIDER: str = Field(default="smtp", env="EMAIL_PROVIDER")  # "smtp" or "ses"
+    
+    # SMTP Configuration
     EMAIL_SMTP_HOST: str = Field(default="smtp.gmail.com", env="EMAIL_SMTP_HOST")
     EMAIL_SMTP_PORT: int = Field(default=587, env="EMAIL_SMTP_PORT")
     EMAIL_USER: str = Field(default="your-email@gmail.com", env="EMAIL_USER")
     EMAIL_PASS: str = Field(default="your-app-password", env="EMAIL_PASS")
     EMAIL_FROM: str = Field(default="noreply@uninoteshub.com", env="EMAIL_FROM")
     EMAIL_USE_TLS: bool = Field(default=True, env="EMAIL_USE_TLS")
+    
+    # AWS SES Configuration
+    AWS_REGION: str = Field(default="us-east-1", env="AWS_REGION")
+    AWS_ACCESS_KEY_ID: Optional[str] = Field(default=None, env="AWS_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY: Optional[str] = Field(default=None, env="AWS_SECRET_ACCESS_KEY")
+    
+    # SES Specific Settings
+    SES_REGION: Optional[str] = Field(default=None, env="SES_REGION")  # If different from AWS_REGION
+    SES_FROM_EMAIL: Optional[str] = Field(default=None, env="SES_FROM_EMAIL")  # Verified SES email
     
     # Redis
     REDIS_URL: Optional[str] = Field(default=None, env="REDIS_URL")

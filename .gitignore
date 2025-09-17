@@ -346,3 +346,64 @@ server.log
 # Temporary files
 *.tmp
 *.temp
+
+# ==============================================================================
+# DEPLOYMENT AND PRODUCTION FILES
+# ==============================================================================
+
+# Production environment files
+.env.prod.local
+.env.production
+.env.staging
+
+# SSL certificates and keys
+*.pem
+*.key
+*.crt
+*.csr
+*.p12
+ssl/
+certs/
+
+# Docker secrets and configs
+docker-compose.override.yml
+docker-compose.*.local.yml
+
+# Kubernetes secrets
+k8s/secrets/
+*.secret.yaml
+*.secret.yml
+
+# Terraform state files
+*.tfstate
+*.tfstate.*
+*.tfvars
+terraform.tfvars.json
+
+# Cloud provider specific
+.aws/
+.gcloud/
+.azure/
+
+# CI/CD pipeline secrets
+.github/secrets/
+.gitlab/secrets/
+
+# Backup files
+*.backup
+*.bak
+*.sql.gz
+*.dump
+
+# Monitoring and logs
+prometheus/
+grafana/data/
+loki/
+elasticsearch/data/
+
+# Let's keep these deployment files
+!docker-compose.yml
+!docker-compose.prod.yml
+!Dockerfile
+!.dockerignore
+!infra/

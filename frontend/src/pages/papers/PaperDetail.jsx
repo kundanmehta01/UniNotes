@@ -57,7 +57,7 @@ const PaperDetail = () => {
   const handleDownload = async () => {
     if (!isAuthenticated) {
       toast.error('Please sign in to download papers');
-      navigate('/login');
+      navigate('/auth');
       return;
     }
     try {
@@ -70,7 +70,7 @@ const PaperDetail = () => {
   const handleBookmark = async () => {
     if (!isAuthenticated) {
       toast.error('Please sign in to bookmark papers');
-      navigate('/login');
+      navigate('/auth');
       return;
     }
     try {

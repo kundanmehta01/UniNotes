@@ -16,6 +16,7 @@ import {
   ModalFooter,
   Textarea
 } from '../../components';
+import PreviewModal from '../../components/ui/PreviewModal';
 import { notesAPI } from '../../lib/api';
 import { formatDate, formatFileSize } from '../../lib/utils';
 import toast from 'react-hot-toast';
@@ -31,6 +32,10 @@ const NoteModeration = () => {
     note: null,
     action: null, // 'approve' or 'reject'
     notes: ''
+  });
+  const [previewModal, setPreviewModal] = useState({
+    isOpen: false,
+    note: null
   });
   const [isModerating, setIsModerating] = useState(false);
   const itemsPerPage = 12;
@@ -265,33 +270,39 @@ const NoteModeration = () => {
                     )}
                   </div>
 
+                  {/* Preview Button */}
+                  <div className="mb-3">
+                    <Button
+                      onClick={() => setPreviewModal({ isOpen: true, note })}
+                      variant="outline"
+                      className="w-full text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-300"
+                      size="sm"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                      Preview Note
+                    </Button>
+                  </div>
+
                   {/* Action Buttons */}
-                  <div className="flex gap-2 mt-6">
+                  <div className="flex gap-2">
                     <Button
                       size="sm"
                       className="bg-green-600 hover:bg-green-700 text-white flex-1"
                       onClick={() => openModerationModal(note, 'approve')}
                     >
-                      Approve
+                      ✓ Approve
                     </Button>
                     <Button
                       size="sm"
-                      variant="destructive"
-                      className="flex-1"
+                      variant="outline"
+                      className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
                       onClick={() => openModerationModal(note, 'reject')}
                     >
-                      Reject
+                      ✗ Reject
                     </Button>
-                  </div>
-
-                  {/* Preview Link */}
-                  <div className="mt-3">
-                    <Link
-                      to={`/notes/${note.id}`}
-                      className="text-sm text-blue-600 hover:text-blue-800 block text-center"
-                    >
-                      Preview Note →
-                    </Link>
                   </div>
                 </CardContent>
               </Card>
@@ -386,6 +397,29 @@ const NoteModeration = () => {
           </Button>
         </ModalFooter>
       </Modal>
+
+      {/* Preview Modal */}
+      {previewModal.isOpen && previewModal.note && (
+        <PreviewModal
+          isOpen={previewModal.isOpen}
+          onClose={() => setPreviewModal({ isOpen: false, note: null })}
+          file={{
+            id: previewModal.note.id,
+            type: 'note',
+            title: previewModal.note.title,
+            storage_key: previewModal.note.storage_key,
+            file_size: previewModal.note.file_size,
+            original_filename: previewModal.note.original_filename || previewModal.note.filename,
+            mime_type: previewModal.note.mime_type || previewModal.note.content_type,
+            created_at: previewModal.note.created_at,
+            uploader_name: getUploaderName(previewModal.note.uploader),
+            subject_name: previewModal.note.subject?.name,
+            semester_name: previewModal.note.semester_year
+          }}
+          itemType="note"
+          showDownloadButton={false}
+        />
+      )}
     </div>
   );
 };

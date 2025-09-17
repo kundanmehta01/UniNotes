@@ -14,15 +14,47 @@ const useAuthStore = create(
       refreshToken: null,
 
       // Actions
-      login: async (credentials) => {
+      // Send OTP for login
+      sendLoginOTP: async (email) => {
         set({ isLoading: true });
         
         try {
-          const response = await authAPI.login(credentials);
+          const response = await authAPI.sendOTP(email, false);
+          set({ isLoading: false });
+          toast.success('OTP sent successfully! Please check your email.');
+          return response;
+        } catch (error) {
+          set({ isLoading: false });
+          throw error;
+        }
+      },
+
+      // Send OTP for registration
+      sendRegistrationOTP: async (userData) => {
+        set({ isLoading: true });
+        
+        try {
+          const response = await authAPI.sendOTP(userData.email, true, userData);
+          set({ isLoading: false });
+          toast.success('OTP sent successfully! Please check your email to complete registration.');
+          return response;
+        } catch (error) {
+          set({ isLoading: false });
+          throw error;
+        }
+      },
+
+      // Verify OTP and authenticate user
+      verifyOTP: async (email, otp) => {
+        set({ isLoading: true });
+        
+        try {
+          const response = await authAPI.verifyOTP(email, otp);
           
-          // Store tokens
+          // Store tokens and user data
           localStorage.setItem('access_token', response.access_token);
           localStorage.setItem('refresh_token', response.refresh_token);
+          localStorage.setItem('user', JSON.stringify(response.user));
           
           // Update state
           set({
@@ -33,7 +65,23 @@ const useAuthStore = create(
             isLoading: false,
           });
           
-          toast.success('Logged in successfully!');
+          // Fetch complete user profile data to ensure we have all fields
+          try {
+            const completeUserData = await authAPI.getProfile();
+            set({ user: completeUserData });
+            localStorage.setItem('user', JSON.stringify(completeUserData));
+          } catch (profileError) {
+            console.warn('Could not fetch complete profile after OTP verification:', profileError);
+            // Continue with the user data from OTP response
+          }
+          
+          // Show appropriate success message based on whether it's a new user
+          if (response.is_new_user) {
+            toast.success('Account created and logged in successfully!');
+          } else {
+            toast.success('Logged in successfully!');
+          }
+          
           return response;
         } catch (error) {
           set({ isLoading: false });
@@ -41,18 +89,15 @@ const useAuthStore = create(
         }
       },
 
+      // Legacy methods for backward compatibility
+      login: async (credentials) => {
+        // Redirect to OTP-based flow
+        return get().sendLoginOTP(credentials.email);
+      },
+
       register: async (userData) => {
-        set({ isLoading: true });
-        
-        try {
-          const response = await authAPI.register(userData);
-          set({ isLoading: false });
-          toast.success('Registration successful! Please check your email to verify your account.');
-          return response;
-        } catch (error) {
-          set({ isLoading: false });
-          throw error;
-        }
+        // Redirect to OTP-based flow
+        return get().sendRegistrationOTP(userData);
       },
 
       logout: async () => {
@@ -201,6 +246,7 @@ const useAuthStore = create(
         try {
           const user = await authAPI.getProfile();
           set({ user });
+          localStorage.setItem('user', JSON.stringify(user));
           return user;
         } catch (error) {
           // If profile fetch fails, user might be logged out
@@ -232,8 +278,18 @@ const useAuthStore = create(
             isAuthenticated: true,
           });
           
-          // Optionally fetch fresh profile data
-          get().fetchProfile();
+          // Only fetch profile if user data is incomplete and we haven't tried recently
+          const lastFetch = localStorage.getItem('last_profile_fetch');
+          const now = Date.now();
+          const FETCH_COOLDOWN = 30000; // 30 seconds
+          
+          if (user && (!user.first_name || !user.last_name) && 
+              (!lastFetch || (now - parseInt(lastFetch)) > FETCH_COOLDOWN)) {
+            localStorage.setItem('last_profile_fetch', now.toString());
+            get().fetchProfile().catch(error => {
+              console.warn('Initial profile fetch failed:', error);
+            });
+          }
         }
       },
 

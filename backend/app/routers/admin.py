@@ -5,7 +5,7 @@ from datetime import datetime
 
 from app.db.session import get_db
 from app.deps import get_current_admin_user
-from app.schemas.user import User, UserCreate, UserUpdate
+from app.schemas.user import User, UserUpdate
 from app.schemas.admin import (
     UserStats, SystemStats, SystemConfig, SystemConfigUpdate,
     BulkUserAction, BulkActionResult, UserActivityLog,
@@ -15,8 +15,12 @@ from app.schemas.admin import (
 from app.schemas.paper import PaperSearchFilters, PaperListResponse, PaperModerationAction, Report, ReportUpdate
 from app.services.admin import get_admin_service
 from app.services.paper import get_paper_service
+from app.services.soft_delete import SoftDeleteService
 from app.deps import get_request_ip, get_request_metadata, get_pagination_params, PaginationParams
 from app.db.models import UserRole, Paper, PaperStatus, Note, NoteStatus
+from app.models.user import User as UserModel
+from app.models.content import Paper as PaperModel, Note as NoteModel, Tag
+from app.models.academic import University, Program, Branch, Semester, Subject
 
 router = APIRouter()
 
@@ -162,7 +166,7 @@ async def get_users(
     if role:
         query = query.filter(UserModel.role == role)
     if is_active is not None:
-        query = query.filter(UserModel.is_email_verified == is_active)
+        query = query.filter(UserModel.is_active == is_active)
     if search:
         from sqlalchemy import or_
         search_term = f"%{search}%"
@@ -184,8 +188,8 @@ async def get_users(
                 "email": user.email,
                 "full_name": f"{user.first_name or ''} {user.last_name or ''}".strip() or None,
                 "role": user.role.value,
-                "is_active": user.is_email_verified,
-                "is_verified": user.is_email_verified,
+                "is_active": user.is_active,  # Actual is_active status
+                "is_verified": True,  # All OTP users are considered verified
                 "created_at": user.created_at,
                 "updated_at": user.updated_at,
                 "last_login": getattr(user, 'last_login', None)
@@ -227,8 +231,8 @@ async def get_user_details(
         email=user.email,
         full_name=f"{user.first_name or ''} {user.last_name or ''}".strip() or None,
         role=user.role,
-        is_active=user.is_email_verified,
-        is_verified=user.is_email_verified,
+        is_active=user.is_active,  # Actual is_active status
+        is_verified=True,  # All OTP users are considered verified
         created_at=user.created_at,
         updated_at=user.updated_at,
         last_login=getattr(user, 'last_login_at', None),
@@ -239,16 +243,22 @@ async def get_user_details(
     )
 
 
-@router.post("/users", response_model=User, status_code=status.HTTP_201_CREATED)
-async def create_user(
-    user_create: UserCreate,
+# DEPRECATED: User creation now handled via OTP authentication
+# Admin endpoint for creating users is no longer available
+@router.post("/users", response_model=dict, status_code=status.HTTP_200_OK)
+async def create_user_deprecated(
+    user_data: dict,  # {"email": str, "first_name": str, "last_name": str}
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db),
 ):
-    """Create a new user (admin only)."""
+    """DEPRECATED: User creation now handled via OTP authentication."""
     
-    admin_service = get_admin_service(db)
-    return admin_service.create_user(user_create, current_user)
+    return {
+        "message": "User creation through admin panel has been replaced with OTP authentication. Users can register by using /auth/send-otp.",
+        "status": "deprecated",
+        "alternative": "/auth/send-otp",
+        "email": user_data.get("email")
+    }
 
 
 @router.put("/users/{user_id}", response_model=User)
@@ -1078,72 +1088,127 @@ async def bulk_resolve_reports(
                 report.admin_notes = notes or "Report dismissed - no violation found"
                 
             elif action == "take_action":
-                report.admin_notes = notes or "Action taken by admin - paper reviewed"
-                
-                # If notes suggest rejection, moderate the paper
-                if "reject" in notes.lower() or "remove" in notes.lower():
+                # Check if this is a paper report or note report
+                if hasattr(report, 'paper_id'):
+                    report.admin_notes = notes or "Action taken by admin - paper reviewed"
+                    
+                    # If notes suggest rejection, moderate the paper
+                    if "reject" in notes.lower() or "remove" in notes.lower():
+                        paper_service = get_paper_service(db)
+                        await paper_service.moderate_paper(
+                            paper_id=str(report.paper_id),
+                            action="reject",
+                            notes=f"Rejected due to report: {report.reason}. Admin notes: {notes}",
+                            moderator=current_user,
+                            ip_address="admin",
+                            user_agent="bulk_admin_action",
+                            force=True  # Allow rejecting already approved papers
+                        )
+                        papers_affected += 1
+                else:
+                    # This is a note report
+                    report.admin_notes = notes or "Action taken by admin - note reviewed"
+                    
+                    # If notes suggest rejection, moderate the note
+                    if "reject" in notes.lower() or "remove" in notes.lower():
+                        # Note: We would need a note moderation service similar to paper service
+                        # For now, just mark it as handled
+                        papers_affected += 1  # Using same counter for simplicity
+                    
+            elif action == "remove_paper":
+                # Check if this is a paper report or note report
+                if hasattr(report, 'paper_id'):
+                    # This is a paper report
+                    report.admin_notes = notes or f"Paper removed due to report: {report.reason}"
                     paper_service = get_paper_service(db)
+                    
+                    # Get paper details for notification
+                    paper = db.query(Paper).filter(Paper.id == report.paper_id).first()
+                    
                     await paper_service.moderate_paper(
                         paper_id=str(report.paper_id),
                         action="reject",
-                        notes=f"Rejected due to report: {report.reason}. Admin notes: {notes}",
+                        notes=f"Paper removed due to report: {report.reason}. Admin notes: {notes}",
                         moderator=current_user,
                         ip_address="admin",
                         user_agent="bulk_admin_action",
                         force=True  # Allow rejecting already approved papers
                     )
-                    papers_affected += 1
                     
-            elif action == "remove_paper":
-                report.admin_notes = notes or f"Paper removed due to report: {report.reason}"
-                paper_service = get_paper_service(db)
-                
-                # Get paper details for notification
-                paper = db.query(Paper).filter(Paper.id == report.paper_id).first()
-                
-                await paper_service.moderate_paper(
-                    paper_id=str(report.paper_id),
-                    action="reject",
-                    notes=f"Paper removed due to report: {report.reason}. Admin notes: {notes}",
-                    moderator=current_user,
-                    ip_address="admin",
-                    user_agent="bulk_admin_action",
-                    force=True  # Allow rejecting already approved papers
-                )
-                
-                # Create notification for paper uploader
-                from app.services.notification import get_notification_service
-                notification_service = get_notification_service(db)
-                
-                if paper and paper.uploader_id:
-                    notification_service.create_paper_status_notification(
-                        user_id=str(paper.uploader_id),
-                        paper_title=paper.title,
-                        status="rejected",
-                        admin_notes=f"Paper removed due to report: {report.reason}. {notes}",
-                        paper_id=str(paper.id)
-                    )
+                    # Create notification for paper uploader
+                    from app.services.notification import get_notification_service
+                    notification_service = get_notification_service(db)
+                    
+                    if paper and paper.uploader_id:
+                        notification_service.create_paper_status_notification(
+                            user_id=str(paper.uploader_id),
+                            paper_title=paper.title,
+                            status="rejected",
+                            admin_notes=f"Paper removed due to report: {report.reason}. {notes}",
+                            paper_id=str(paper.id)
+                        )
+                else:
+                    # This is a note report
+                    from app.models.content import Note
+                    report.admin_notes = notes or f"Note removed due to report: {report.reason}"
+                    
+                    # Get note details for notification
+                    note = db.query(Note).filter(Note.id == report.note_id).first()
+                    
+                    if note:
+                        # Update note status to rejected
+                        note.status = "REJECTED"
+                        note.moderation_notes = f"Note removed due to report: {report.reason}. Admin notes: {notes}"
+                        
+                        # Create notification for note uploader
+                        from app.services.notification import get_notification_service
+                        notification_service = get_notification_service(db)
+                        
+                        if note.uploader_id:
+                            # Note: Using paper notification for now, could create note-specific ones later
+                            notification_service.create_paper_status_notification(
+                                user_id=str(note.uploader_id),
+                                paper_title=f"Note: {note.title}",
+                                status="rejected",
+                                admin_notes=f"Note removed due to report: {report.reason}. {notes}",
+                                paper_id=str(note.id)
+                            )
                 
                 papers_affected += 1
                 
             elif action == "warn_user":
                 report.admin_notes = notes or f"User warned about: {report.reason}"
                 
-                # Create warning notification for the paper uploader
+                # Create warning notification for the uploader
                 from app.services.notification import get_notification_service
                 notification_service = get_notification_service(db)
                 
-                # Get paper details for notification
-                paper = db.query(Paper).filter(Paper.id == report.paper_id).first()
-                if paper and paper.uploader_id:
-                    notification_service.create_warning_notification(
-                        user_id=str(paper.uploader_id),
-                        paper_title=paper.title,
-                        reason=report.reason,
-                        admin_notes=notes,
-                        paper_id=str(paper.id),
-                        report_id=str(report.id)
-                    )
+                # Check if this is a paper report or note report
+                if hasattr(report, 'paper_id'):
+                    # This is a paper report
+                    paper = db.query(Paper).filter(Paper.id == report.paper_id).first()
+                    if paper and paper.uploader_id:
+                        notification_service.create_warning_notification(
+                            user_id=str(paper.uploader_id),
+                            paper_title=paper.title,
+                            reason=report.reason,
+                            admin_notes=notes,
+                            paper_id=str(paper.id),
+                            report_id=str(report.id)
+                        )
+                else:
+                    # This is a note report
+                    from app.models.content import Note
+                    note = db.query(Note).filter(Note.id == report.note_id).first()
+                    if note and note.uploader_id:
+                        notification_service.create_warning_notification(
+                            user_id=str(note.uploader_id),
+                            paper_title=f"Note: {note.title}",
+                            reason=report.reason,
+                            admin_notes=notes,
+                            paper_id=str(note.id),  # Using paper_id field for note ID
+                            report_id=str(report.id)
+                        )
                 
                 warnings_issued += 1
                 
@@ -1168,3 +1233,316 @@ async def bulk_resolve_reports(
     }
     
     return response
+
+
+# Soft Delete Management
+@router.get("/soft-delete/overview")
+async def get_soft_delete_overview(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    """Get overview of soft deleted items across all models."""
+    
+    # Count deleted items by type
+    deleted_users = SoftDeleteService.get_deleted_query(UserModel, db).count()
+    deleted_papers = SoftDeleteService.get_deleted_query(PaperModel, db).count()
+    deleted_notes = SoftDeleteService.get_deleted_query(NoteModel, db).count()
+    deleted_tags = SoftDeleteService.get_deleted_query(Tag, db).count()
+    deleted_universities = SoftDeleteService.get_deleted_query(University, db).count()
+    deleted_programs = SoftDeleteService.get_deleted_query(Program, db).count()
+    deleted_branches = SoftDeleteService.get_deleted_query(Branch, db).count()
+    deleted_semesters = SoftDeleteService.get_deleted_query(Semester, db).count()
+    deleted_subjects = SoftDeleteService.get_deleted_query(Subject, db).count()
+    
+    total_deleted = (
+        deleted_users + deleted_papers + deleted_notes + deleted_tags +
+        deleted_universities + deleted_programs + deleted_branches + 
+        deleted_semesters + deleted_subjects
+    )
+    
+    return {
+        "total_deleted_items": total_deleted,
+        "deleted_by_type": {
+            "users": deleted_users,
+            "papers": deleted_papers,
+            "notes": deleted_notes,
+            "tags": deleted_tags,
+            "universities": deleted_universities,
+            "programs": deleted_programs,
+            "branches": deleted_branches,
+            "semesters": deleted_semesters,
+            "subjects": deleted_subjects
+        },
+        "generated_at": datetime.utcnow().isoformat() + "Z"
+    }
+
+
+@router.get("/soft-delete/{model_type}")
+async def get_deleted_items(
+    model_type: str,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    """Get list of soft deleted items for a specific model type."""
+    
+    model_map = {
+        "users": UserModel,
+        "papers": PaperModel,
+        "notes": NoteModel,
+        "tags": Tag,
+        "universities": University,
+        "programs": Program,
+        "branches": Branch,
+        "semesters": Semester,
+        "subjects": Subject
+    }
+    
+    if model_type not in model_map:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid model type. Must be one of: {', '.join(model_map.keys())}"
+        )
+    
+    model = model_map[model_type]
+    query = SoftDeleteService.get_deleted_query(model, db)
+    
+    # Get total count
+    total = query.count()
+    
+    # Apply pagination
+    items = query.order_by(model.deleted_at.desc()).offset(skip).limit(limit).all()
+    
+    # Format response based on model type
+    formatted_items = []
+    for item in items:
+        base_info = {
+            "id": str(item.id),
+            "deleted_at": item.deleted_at,
+            "is_deleted": item.is_deleted
+        }
+        
+        if model_type == "users":
+            base_info.update({
+                "email": item.email,
+                "full_name": item.full_name,
+                "role": item.role.value if item.role else None,
+                "created_at": item.created_at
+            })
+        elif model_type in ["papers", "notes"]:
+            base_info.update({
+                "title": item.title,
+                "status": item.status.value if item.status else None,
+                "uploader_email": item.uploader.email if item.uploader else None,
+                "created_at": item.created_at
+            })
+        elif model_type == "tags":
+            base_info.update({
+                "name": item.name,
+                "slug": item.slug,
+                "created_at": item.created_at
+            })
+        elif model_type in ["universities", "programs", "branches", "semesters", "subjects"]:
+            base_info.update({
+                "name": item.name,
+                "created_at": item.created_at
+            })
+            if hasattr(item, 'slug'):
+                base_info["slug"] = item.slug
+        
+        formatted_items.append(base_info)
+    
+    return {
+        "items": formatted_items,
+        "total": total,
+        "page": (skip // limit) + 1,
+        "page_size": limit,
+        "total_pages": (total + limit - 1) // limit,
+        "model_type": model_type
+    }
+
+
+@router.post("/soft-delete/{model_type}/{item_id}/restore")
+async def restore_item(
+    model_type: str,
+    item_id: str,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    """Restore a soft deleted item."""
+    
+    model_map = {
+        "users": UserModel,
+        "papers": PaperModel,
+        "notes": NoteModel,
+        "tags": Tag,
+        "universities": University,
+        "programs": Program,
+        "branches": Branch,
+        "semesters": Semester,
+        "subjects": Subject
+    }
+    
+    if model_type not in model_map:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid model type. Must be one of: {', '.join(model_map.keys())}"
+        )
+    
+    model = model_map[model_type]
+    restored_item = SoftDeleteService.restore_by_id(model, item_id, db)
+    
+    if not restored_item:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"No deleted {model_type[:-1]} found with ID {item_id}"
+        )
+    
+    # Log the restoration action
+    from app.utils.logging import get_audit_logger
+    audit_logger = get_audit_logger()
+    audit_logger.info(
+        f"Admin {current_user.email} restored {model_type[:-1]} {item_id}",
+        extra={
+            "admin_id": str(current_user.id),
+            "action": "restore",
+            "resource_type": model_type[:-1],
+            "resource_id": item_id
+        }
+    )
+    
+    return {
+        "message": f"{model_type[:-1].capitalize()} restored successfully",
+        "item_id": item_id,
+        "model_type": model_type,
+        "restored_at": datetime.utcnow(),
+        "restored_by": current_user.email
+    }
+
+
+@router.post("/soft-delete/{model_type}/bulk-restore")
+async def bulk_restore_items(
+    model_type: str,
+    item_ids: str = Query(..., description="Comma-separated item IDs"),
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    """Restore multiple soft deleted items."""
+    
+    model_map = {
+        "users": UserModel,
+        "papers": PaperModel,
+        "notes": NoteModel,
+        "tags": Tag,
+        "universities": University,
+        "programs": Program,
+        "branches": Branch,
+        "semesters": Semester,
+        "subjects": Subject
+    }
+    
+    if model_type not in model_map:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid model type. Must be one of: {', '.join(model_map.keys())}"
+        )
+    
+    # Parse comma-separated IDs
+    item_id_list = [id.strip() for id in item_ids.split(',') if id.strip()]
+    
+    if not item_id_list:
+        raise HTTPException(status_code=400, detail="No valid item IDs provided")
+    
+    model = model_map[model_type]
+    restored_count = SoftDeleteService.bulk_restore(model, item_id_list, db)
+    
+    # Log the bulk restoration action
+    from app.utils.logging import get_audit_logger
+    audit_logger = get_audit_logger()
+    audit_logger.info(
+        f"Admin {current_user.email} bulk restored {restored_count} {model_type}",
+        extra={
+            "admin_id": str(current_user.id),
+            "action": "bulk_restore",
+            "resource_type": model_type,
+            "item_count": restored_count,
+            "item_ids": item_id_list
+        }
+    )
+    
+    return {
+        "message": f"{restored_count} {model_type} restored successfully",
+        "restored_count": restored_count,
+        "total_requested": len(item_id_list),
+        "model_type": model_type,
+        "restored_at": datetime.utcnow(),
+        "restored_by": current_user.email
+    }
+
+
+@router.delete("/soft-delete/{model_type}/{item_id}/hard-delete")
+async def hard_delete_item(
+    model_type: str,
+    item_id: str,
+    confirm: bool = Query(False, description="Must be true to confirm hard delete"),
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    """Permanently delete an item (use with extreme caution)."""
+    
+    if not confirm:
+        raise HTTPException(
+            status_code=400, 
+            detail="Hard delete must be confirmed by setting confirm=true"
+        )
+    
+    model_map = {
+        "users": UserModel,
+        "papers": PaperModel,
+        "notes": NoteModel,
+        "tags": Tag,
+        "universities": University,
+        "programs": Program,
+        "branches": Branch,
+        "semesters": Semester,
+        "subjects": Subject
+    }
+    
+    if model_type not in model_map:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid model type. Must be one of: {', '.join(model_map.keys())}"
+        )
+    
+    model = model_map[model_type]
+    success = SoftDeleteService.hard_delete_by_id(model, item_id, db)
+    
+    if not success:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"No {model_type[:-1]} found with ID {item_id}"
+        )
+    
+    # Log the hard deletion action
+    from app.utils.logging import get_audit_logger
+    audit_logger = get_audit_logger()
+    audit_logger.warning(
+        f"Admin {current_user.email} HARD DELETED {model_type[:-1]} {item_id}",
+        extra={
+            "admin_id": str(current_user.id),
+            "action": "hard_delete",
+            "resource_type": model_type[:-1],
+            "resource_id": item_id,
+            "severity": "critical"
+        }
+    )
+    
+    return {
+        "message": f"{model_type[:-1].capitalize()} permanently deleted",
+        "item_id": item_id,
+        "model_type": model_type,
+        "deleted_at": datetime.utcnow(),
+        "deleted_by": current_user.email,
+        "warning": "This action cannot be undone"
+    }

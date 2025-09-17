@@ -19,10 +19,10 @@ import toast from 'react-hot-toast';
 
 const Profile = () => {
   const navigate = useNavigate();
-  const { user, updateProfile: updateAuthProfile, isLoading: authLoading } = useAuthStore();
+  const { user, updateProfile: updateAuthProfile, fetchProfile, isLoading: authLoading } = useAuthStore();
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [formData, setFormData] = useState({
@@ -32,12 +32,38 @@ const Profile = () => {
     email: '',
     avatar_url: ''
   });
-  const [passwordData, setPasswordData] = useState({
-    current_password: '',
-    new_password: '',
-    confirm_password: ''
-  });
   const [errors, setErrors] = useState({});
+
+  // Refresh profile data on component mount if user data seems incomplete
+  // This will only run once when component mounts
+  useEffect(() => {
+    let isMounted = true;
+    
+    const tryRefreshProfile = async () => {
+      // Only try if user exists, is missing name data, and component is still mounted
+      if (isMounted && user && (!user.first_name || !user.last_name)) {
+        console.log('Profile data incomplete, attempting refresh...');
+        setIsRefreshing(true);
+        try {
+          await fetchProfile();
+        } catch (error) {
+          console.error('Failed to refresh profile:', error);
+        } finally {
+          if (isMounted) {
+            setIsRefreshing(false);
+          }
+        }
+      }
+    };
+    
+    // Small delay to prevent immediate fetch if user data is still loading
+    const timeout = setTimeout(tryRefreshProfile, 100);
+    
+    return () => {
+      isMounted = false;
+      clearTimeout(timeout);
+    };
+  }, []); // Empty dependency array - only run once on mount
 
   useEffect(() => {
     if (user) {
@@ -92,17 +118,6 @@ const Profile = () => {
     }
   };
 
-  const handlePasswordChange = (e) => {
-    const { name, value } = e.target;
-    setPasswordData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
-    }
-  };
 
   const validateProfileForm = () => {
     const newErrors = {};
@@ -119,25 +134,18 @@ const Profile = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const validatePasswordForm = () => {
-    const newErrors = {};
-    
-    if (!passwordData.current_password) {
-      newErrors.current_password = 'Current password is required';
-    }
-    
-    if (!passwordData.new_password) {
-      newErrors.new_password = 'New password is required';
-    } else if (passwordData.new_password.length < 8) {
-      newErrors.new_password = 'Password must be at least 8 characters long';
-    }
-    
-    if (passwordData.new_password !== passwordData.confirm_password) {
-      newErrors.confirm_password = 'Passwords do not match';
-    }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  const handleRefreshProfile = async () => {
+    setIsRefreshing(true);
+    try {
+      await fetchProfile();
+      toast.success('Profile refreshed successfully!');
+    } catch (error) {
+      console.error('Failed to refresh profile:', error);
+      toast.error('Failed to refresh profile data');
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -187,35 +195,19 @@ const Profile = () => {
     }
   };
 
-  const handlePasswordSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!validatePasswordForm()) {
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      await authAPI.changePassword(passwordData.current_password, passwordData.new_password);
-      setPasswordData({ current_password: '', new_password: '', confirm_password: '' });
-      setIsChangingPassword(false);
-      toast.success('Password changed successfully!');
-    } catch (error) {
-      console.error('Password change error:', error);
-      if (error.response?.status === 401) {
-        setErrors({ current_password: 'Current password is incorrect' });
-      } else {
-        toast.error('Failed to change password');
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   if (authLoading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loading />
+      </div>
+    );
+  }
+
+  if (isRefreshing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loading text="Refreshing profile data..." />
       </div>
     );
   }
@@ -239,8 +231,26 @@ const Profile = () => {
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Profile Settings</h1>
-        <p className="text-gray-600">Manage your account information and preferences</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Profile Settings</h1>
+            <p className="text-gray-600">Manage your account information and preferences</p>
+          </div>
+          {(!user.first_name || !user.last_name) && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefreshProfile}
+              disabled={isRefreshing}
+              className="flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {isRefreshing ? 'Refreshing...' : 'Refresh Profile'}
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
@@ -258,12 +268,22 @@ const Profile = () => {
                     />
                   ) : (
                     <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-                      {(user.first_name?.[0] || '') + (user.last_name?.[0] || user.email[0])}
+                      {user.first_name && user.last_name 
+                        ? (user.first_name[0] + user.last_name[0]).toUpperCase()
+                        : user.full_name
+                        ? user.full_name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
+                        : user.email ? user.email.slice(0, 2).toUpperCase()
+                        : 'U'}
                     </div>
                   )}
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                  {user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : 'Unnamed User'}
+                  {user.first_name && user.last_name 
+                    ? `${user.first_name} ${user.last_name}` 
+                    : user.full_name 
+                    ? user.full_name
+                    : user.email ? user.email.split('@')[0] 
+                    : 'User'}
                 </h3>
                 <p className="text-gray-600 mb-3">{user.email}</p>
                 <Badge className={getRoleBadgeColor(user.role)}>
@@ -279,12 +299,6 @@ const Profile = () => {
               
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Email Verified:</span>
-                    <span className={user.is_email_verified ? 'text-green-600' : 'text-red-600'}>
-                      {user.is_email_verified ? '✓ Verified' : '✗ Not Verified'}
-                    </span>
-                  </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Member Since:</span>
                     <span className="text-gray-900">
@@ -323,20 +337,6 @@ const Profile = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {!user.is_email_verified && (
-                <Alert className="mb-6">
-                  <AlertDescription>
-                    Please verify your email address to access all features.
-                    <Button
-                      variant="link"
-                      className="p-0 ml-2 h-auto"
-                      onClick={() => navigate('/auth/verify-email')}
-                    >
-                      Resend verification email
-                    </Button>
-                  </AlertDescription>
-                </Alert>
-              )}
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Avatar Upload */}
@@ -355,7 +355,10 @@ const Profile = () => {
                           />
                         ) : (
                           <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white text-lg font-bold">
-                            {(formData.first_name?.[0] || '') + (formData.last_name?.[0] || user.email[0])}
+                            {formData.first_name && formData.last_name 
+                              ? (formData.first_name[0] + formData.last_name[0]).toUpperCase()
+                              : user.email ? user.email.slice(0, 2).toUpperCase()
+                              : 'U'}
                           </div>
                         )}
                       </div>
@@ -452,78 +455,67 @@ const Profile = () => {
             </CardContent>
           </Card>
 
-          {/* Change Password */}
+          {/* Security Information */}
           <Card className="mt-6">
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                Change Password
-                {!isChangingPassword && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsChangingPassword(true)}
-                  >
-                    Change Password
-                  </Button>
-                )}
+              <CardTitle className="flex items-center gap-2">
+                <svg
+                  className="w-5 h-5 text-green-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                  />
+                </svg>
+                Secure Authentication
               </CardTitle>
             </CardHeader>
-            {isChangingPassword && (
-              <CardContent>
-                <form onSubmit={handlePasswordSubmit} className="space-y-4">
-                  <Input
-                    name="current_password"
-                    type="password"
-                    label="Current Password"
-                    value={passwordData.current_password}
-                    onChange={handlePasswordChange}
-                    error={errors.current_password}
-                    required
-                  />
-                  <Input
-                    name="new_password"
-                    type="password"
-                    label="New Password"
-                    value={passwordData.new_password}
-                    onChange={handlePasswordChange}
-                    error={errors.new_password}
-                    help="Must be at least 8 characters long"
-                    required
-                  />
-                  <Input
-                    name="confirm_password"
-                    type="password"
-                    label="Confirm New Password"
-                    value={passwordData.confirm_password}
-                    onChange={handlePasswordChange}
-                    error={errors.confirm_password}
-                    required
-                  />
-
-                  <div className="flex gap-3 pt-4">
-                    <Button
-                      type="submit"
-                      loading={isLoading}
-                      disabled={isLoading}
+            <CardContent>
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0">
+                    <svg
+                      className="w-5 h-5 text-green-600 mt-0.5"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
                     >
-                      Change Password
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        setIsChangingPassword(false);
-                        setPasswordData({ current_password: '', new_password: '', confirm_password: '' });
-                        setErrors({});
-                      }}
-                      disabled={isLoading}
-                    >
-                      Cancel
-                    </Button>
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
                   </div>
-                </form>
-              </CardContent>
-            )}
+                  <div>
+                    <h4 className="text-sm font-medium text-green-900 mb-2">
+                      Password-Free Security
+                    </h4>
+                    <p className="text-sm text-green-700 mb-3">
+                      Your account uses our secure email verification system. No passwords to remember or manage!
+                    </p>
+                    <div className="space-y-2 text-sm text-green-600">
+                      <div className="flex items-center gap-2">
+                        <span>✓</span>
+                        <span>Login with email verification codes</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span>✓</span>
+                        <span>Enhanced security with time-limited codes</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span>✓</span>
+                        <span>No password resets or breaches to worry about</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
           </Card>
         </div>
       </div>

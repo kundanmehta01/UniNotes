@@ -1,100 +1,87 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import useAuthStore from '../../stores/authStore';
-import { Button, Input, Card, CardHeader, CardTitle, CardContent, Alert, AlertDescription } from '../../components';
-import toast from 'react-hot-toast';
+import { useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Button, Card, CardHeader, CardTitle, CardContent, Alert, AlertDescription } from '../../components';
 
 const ForgotPassword = () => {
-  const { forgotPassword, isLoading } = useAuthStore();
-  const [email, setEmail] = useState('');
-  const [emailSent, setEmailSent] = useState(false);
-  const [error, setError] = useState('');
+  const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!email) {
-      setError('Email is required');
-      return;
-    }
+  // Auto redirect to auth page after 8 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      navigate('/auth');
+    }, 8000);
 
-    if (!/\S+@\S+\.\S+/.test(email)) {
-      setError('Please enter a valid email address');
-      return;
-    }
-
-    try {
-      await forgotPassword(email);
-      setEmailSent(true);
-      toast.success('Password reset email sent!');
-    } catch (error) {
-      console.error('Forgot password error:', error);
-    }
-  };
-
-  if (emailSent) {
-    return (
-      <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-md w-full space-y-8">
-          <Card>
-            <CardContent className="text-center py-8">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Check your email</h3>
-              <p className="text-gray-600 mb-6">
-                We've sent a password reset link to <strong>{email}</strong>
-              </p>
-              <Link to="/login">
-                <Button>Back to Sign In</Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
+    return () => clearTimeout(timer);
+  }, [navigate]);
 
   return (
     <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <h2 className="text-3xl font-extrabold text-gray-900">Forgot your password?</h2>
+          <div className="w-16 h-16 bg-blue-600 rounded-lg flex items-center justify-center mx-auto mb-4">
+            <svg
+              className="w-8 h-8 text-white"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+              />
+            </svg>
+          </div>
+          <h2 className="text-3xl font-extrabold text-gray-900">
+            Password-Free Login
+          </h2>
           <p className="mt-2 text-sm text-gray-600">
-            Enter your email address and we'll send you a link to reset your password.
+            We've upgraded to a more secure login system
           </p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-center">Reset Password</CardTitle>
+            <CardTitle className="text-center">No More Passwords!</CardTitle>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <Input
-                type="email"
-                label="Email address"
-                placeholder="Enter your email"
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  setError('');
-                }}
-                error={error}
-                required
-              />
+          <CardContent className="space-y-6">
+            <Alert>
+              <AlertDescription>
+                <strong>Good News!</strong> We've switched to a secure, password-free authentication system. 
+                No more forgotten passwords!
+              </AlertDescription>
+            </Alert>
 
-              <Button type="submit" className="w-full" loading={isLoading} disabled={isLoading}>
-                Send Reset Link
-              </Button>
-            </form>
+            <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h3 className="font-medium text-blue-900 mb-2">How it works now:</h3>
+                <ol className="list-decimal list-inside space-y-1 text-sm text-blue-700">
+                  <li>Enter your email on the login page</li>
+                  <li>We'll send you a 6-digit verification code</li>
+                  <li>Enter the code and you're logged in instantly!</li>
+                </ol>
+              </div>
 
-            <div className="mt-6 text-center">
-              <Link to="/login" className="text-sm text-blue-600 hover:text-blue-500">
-                Back to Sign In
+              <div className="text-center">
+                <p className="text-sm text-gray-600 mb-4">
+                  ✨ More secure • ⚡ Faster login • 🔐 No passwords to remember
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Link to="/auth">
+                <Button className="w-full">
+                  Try the new auth system
+                </Button>
               </Link>
+            </div>
+
+            <div className="text-center">
+              <p className="text-xs text-gray-500">
+                Redirecting to auth page automatically in a few seconds...
+              </p>
             </div>
           </CardContent>
         </Card>

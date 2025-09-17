@@ -38,7 +38,7 @@ const Bookmarks = () => {
   useEffect(() => {
     if (!isAuthenticated) {
       toast.error('Please sign in to view your bookmarks');
-      navigate('/auth/login');
+      navigate('/auth');
       return;
     }
   }, [isAuthenticated, navigate]);

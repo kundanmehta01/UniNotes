@@ -7,11 +7,10 @@ import toast from 'react-hot-toast';
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, isLoading } = useAuthStore();
+  const { sendLoginOTP, isLoading } = useAuthStore();
   
   const [formData, setFormData] = useState({
     email: '',
-    password: '',
   });
   const [errors, setErrors] = useState({});
 
@@ -42,12 +41,6 @@ const Login = () => {
       newErrors.email = 'Please enter a valid email address';
     }
 
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -60,14 +53,18 @@ const Login = () => {
     }
 
     try {
-      await login({
-        email: formData.email,
-        password: formData.password,
+      await sendLoginOTP(formData.email);
+      
+      // Navigate to OTP verification page
+      navigate('/auth/verify-otp', {
+        state: {
+          email: formData.email,
+          isRegistration: false,
+          from
+        }
       });
-      toast.success('Welcome back!');
-      navigate(from, { replace: true });
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('Send OTP error:', error);
       // Error will be handled by the store and show a toast
     }
   };
@@ -117,27 +114,11 @@ const Login = () => {
                 autoComplete="email"
               />
 
-              <Input
-                name="password"
-                type="password"
-                label="Password"
-                placeholder="Enter your password"
-                value={formData.password}
-                onChange={handleChange}
-                error={errors.password}
-                required
-                autoComplete="current-password"
-              />
-
-              <div className="flex items-center justify-between">
-                <div className="text-sm">
-                  <Link
-                    to="/auth/forgot-password"
-                    className="font-medium text-blue-600 hover:text-blue-500"
-                  >
-                    Forgot your password?
-                  </Link>
-                </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-sm text-blue-700">
+                  <strong>Secure Login:</strong> We'll send a verification code to your email. 
+                  No passwords needed!
+                </p>
               </div>
 
               <Button
@@ -146,7 +127,7 @@ const Login = () => {
                 loading={isLoading}
                 disabled={isLoading}
               >
-                Sign in
+                Send verification code
               </Button>
             </form>
 

@@ -3,6 +3,7 @@ export { default as Button } from './ui/Button';
 export { default as Input } from './ui/Input';
 export { default as Select } from './ui/Select';
 export { default as Textarea } from './ui/Textarea';
+export { default as OTPInput } from './ui/OTPInput';
 export { default as AcademicLevelTabs } from './ui/AcademicLevelTabs';
 export { default as SubjectCards } from './ui/SubjectCards';
 export { default as FeaturedResources } from './ui/FeaturedResources';

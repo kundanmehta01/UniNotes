@@ -16,7 +16,7 @@ const DashboardStats = ({ stats, isLoading = false }) => {
     },
     {
       key: 'uploads',
-      label: 'My Uploads',
+      label: 'My Papers',
       color: 'from-emerald-500 to-emerald-600',
       bgColor: 'bg-emerald-50',
       textColor: 'text-emerald-600',

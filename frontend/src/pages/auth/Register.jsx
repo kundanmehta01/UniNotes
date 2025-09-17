@@ -6,14 +6,12 @@ import toast from 'react-hot-toast';
 
 const Register = () => {
   const navigate = useNavigate();
-  const { register, isLoading } = useAuthStore();
+  const { sendRegistrationOTP, isLoading } = useAuthStore();
   
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
     email: '',
-    password: '',
-    confirmPassword: '',
   });
   const [errors, setErrors] = useState({});
 
@@ -54,20 +52,6 @@ const Register = () => {
       newErrors.email = 'Please enter a valid email address';
     }
 
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
-    } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
-      newErrors.password = 'Password must contain at least one uppercase letter, one lowercase letter, and one number';
-    }
-
-    if (!formData.confirmPassword) {
-      newErrors.confirmPassword = 'Please confirm your password';
-    } else if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -79,16 +63,23 @@ const Register = () => {
       return;
     }
 
+    const userData = {
+      first_name: formData.firstName,
+      last_name: formData.lastName,
+      email: formData.email,
+    };
+
     try {
-      await register({
-        first_name: formData.firstName,
-        last_name: formData.lastName,
-        email: formData.email,
-        password: formData.password,
-      });
+      await sendRegistrationOTP(userData);
       
-      toast.success('Account created successfully! Please check your email to verify your account.');
-      navigate('/auth/verify-email', { state: { email: formData.email } });
+      // Navigate to OTP verification page
+      navigate('/auth/verify-otp', {
+        state: {
+          email: formData.email,
+          isRegistration: true,
+          userData: userData
+        }
+      });
     } catch (error) {
       console.error('Registration error:', error);
       // Error will be handled by the store and show a toast
@@ -165,37 +156,11 @@ const Register = () => {
                 autoComplete="email"
               />
 
-              <Input
-                name="password"
-                type="password"
-                label="Password"
-                placeholder="Enter your password"
-                value={formData.password}
-                onChange={handleChange}
-                error={errors.password}
-                required
-                autoComplete="new-password"
-              />
-
-              <Input
-                name="confirmPassword"
-                type="password"
-                label="Confirm password"
-                placeholder="Confirm your password"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                error={errors.confirmPassword}
-                required
-                autoComplete="new-password"
-              />
-
-              <div className="text-xs text-gray-500">
-                <p>Password requirements:</p>
-                <ul className="list-disc list-inside mt-1 space-y-1">
-                  <li>At least 6 characters long</li>
-                  <li>Contains uppercase and lowercase letters</li>
-                  <li>Contains at least one number</li>
-                </ul>
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                <p className="text-sm text-green-700">
+                  <strong>Quick Registration:</strong> Just provide your basic info and we'll send a 
+                  verification code to your email. Your account will be created automatically!
+                </p>
               </div>
 
               <Button
@@ -204,7 +169,7 @@ const Register = () => {
                 loading={isLoading}
                 disabled={isLoading}
               >
-                Create account
+                Send verification code
               </Button>
             </form>
 

@@ -1,8 +1,9 @@
-import createPlaceholder from '../../utils/createPlaceholder';
+import React from 'react';
+import { Navigate } from 'react-router-dom';
 
-const Privacy = createPlaceholder(
-  'Privacy Policy',
-  'This page will contain our privacy policy and data handling practices.'
-);
+// This is a placeholder component that redirects to the comprehensive Privacy Policy
+const Privacy = () => {
+  return <Navigate to="/privacy-policy" replace />;
+};
 
 export default Privacy;

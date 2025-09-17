@@ -14,18 +14,15 @@ from app.deps import (
     get_request_metadata,
 )
 from app.schemas.user import (
-    UserCreate,
     UserUpdate,
-    UserLogin,
     Token,
     User,
     EmailVerification,
-    UserPasswordReset,
-    UserPasswordResetConfirm,
     TokenRefresh,
 )
 from app.services.auth import get_auth_service
-from app.services.security import verify_token, create_token_pair
+from app.services.otp import get_otp_service
+from app.services.security import verify_token, create_token_pair, create_token_pair
 from app.utils.errors import AuthenticationError
 
 router = APIRouter()
@@ -33,62 +30,24 @@ router = APIRouter()
 
 
 
-@router.post("/register", response_model=dict, status_code=status.HTTP_201_CREATED)
-async def register(
-    user_data: UserCreate,
-    request: Request,
-    db: Session = Depends(get_db),
-    background_tasks: BackgroundTasks = None,
-):
-    """Register a new user account."""
-    
-    # Get request metadata
-    ip_address = get_request_ip(request)
-    metadata = get_request_metadata(request)
-    user_agent = metadata.get("user_agent", "")
-    
-    # Get auth service
-    auth_service = get_auth_service(db)
-    
-    # Register user
-    user, verification_token = await auth_service.register_user(
-        user_data=user_data,
-        ip_address=ip_address,
-        user_agent=user_agent,
-    )
-    
-    return {
-        "message": "User registered successfully. Please check your email to verify your account.",
-        "user_id": str(user.id),
-        "email": user.email,
-    }
+# Registration is now handled automatically via OTP login
 
 
+# Traditional login endpoint removed - use OTP authentication instead
+# Legacy endpoint kept for backward compatibility
 @router.post("/login", response_model=dict)
-async def login(
-    login_data: UserLogin,
+async def login_deprecated(
+    login_data: dict,  # {"email": str, "password": str}
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """Authenticate user and return access tokens with user data."""
-    
-    # Get request metadata
-    ip_address = get_request_ip(request)
-    metadata = get_request_metadata(request)
-    user_agent = metadata.get("user_agent", "")
-    
-    # Get auth service
-    auth_service = get_auth_service(db)
-    
-    # Authenticate user
-    login_response = await auth_service.login_user(
-        email=login_data.email,
-        password=login_data.password,
-        ip_address=ip_address,
-        user_agent=user_agent,
-    )
-    
-    return login_response
+    """DEPRECATED: Password login replaced with OTP authentication."""
+    return {
+        "message": "Password-based login has been replaced with OTP authentication. Please use /auth/send-otp to receive a login code.",
+        "status": "deprecated",
+        "redirect": "/auth/send-otp",
+        "email": login_data.get("email")
+    }
 
 
 @router.post("/refresh", response_model=Token)
@@ -111,10 +70,9 @@ async def refresh_token(
         raise AuthenticationError(detail="Invalid token payload")
     
     # Verify user still exists and is active
-    from app.db.models import User
-    user = db.query(User).filter(
-        User.id == user_id,
-        User.is_email_verified == True
+    from app.models.user import User as UserModel
+    user = db.query(UserModel).filter(
+        UserModel.id == user_id
     ).first()
     
     if not user:
@@ -126,186 +84,53 @@ async def refresh_token(
     return Token(**new_tokens)
 
 
+# Legacy email verification endpoints are deprecated in favor of OTP authentication
+# These endpoints are kept for backward compatibility but will return a redirect message
+
 @router.get("/verify-email")
-async def verify_email_get(
+async def verify_email_get_deprecated(
     token: str,
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """Verify user email address via GET request (from email link)."""
-    
-    # Get request metadata
-    ip_address = get_request_ip(request)
-    metadata = get_request_metadata(request)
-    user_agent = metadata.get("user_agent", "")
-    
-    # Get auth service
-    auth_service = get_auth_service(db)
-    
-    # Verify email
-    user = await auth_service.verify_email(
-        token=token,
-        ip_address=ip_address,
-        user_agent=user_agent,
-    )
-    
+    """DEPRECATED: Email verification is now handled via OTP."""
     return {
-        "message": "Email verified successfully! You can now log in to your account.",
-        "user_id": str(user.id),
-        "email": user.email,
-        "status": "verified"
+        "message": "Email verification has been replaced with OTP authentication. Please use the /auth/send-otp endpoint to receive a login code.",
+        "status": "deprecated",
+        "redirect": "/auth/send-otp"
     }
 
 
 @router.post("/verify-email")
-async def verify_email(
+async def verify_email_deprecated(
     verification_data: EmailVerification,
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """Verify user email address via POST request (API)."""
-    
-    # Get request metadata
-    ip_address = get_request_ip(request)
-    metadata = get_request_metadata(request)
-    user_agent = metadata.get("user_agent", "")
-    
-    # Get auth service
-    auth_service = get_auth_service(db)
-    
-    # Verify email
-    user = await auth_service.verify_email(
-        token=verification_data.token,
-        ip_address=ip_address,
-        user_agent=user_agent,
-    )
-    
+    """DEPRECATED: Email verification is now handled via OTP."""
     return {
-        "message": "Email verified successfully. You can now log in.",
-        "user_id": str(user.id),
-        "email": user.email,
+        "message": "Email verification has been replaced with OTP authentication. Please use the /auth/send-otp endpoint to receive a login code.",
+        "status": "deprecated",
+        "redirect": "/auth/send-otp"
     }
 
 
 @router.post("/resend-verification")
-async def resend_verification_email(
-    email_data: UserPasswordReset,  # Reuse schema since it has email field
+async def resend_verification_deprecated(
+    email_data: dict,  # {"email": str}
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """Resend email verification."""
-    
-    # Get request metadata
-    ip_address = get_request_ip(request)
-    metadata = get_request_metadata(request)
-    user_agent = metadata.get("user_agent", "")
-    
-    # Get auth service
-    auth_service = get_auth_service(db)
-    
-    # Resend verification email
-    success = await auth_service.resend_verification_email(
-        email=email_data.email,
-        ip_address=ip_address,
-        user_agent=user_agent,
-    )
-    
+    """DEPRECATED: Email verification is now handled via OTP."""
     return {
-        "message": "If an account with this email exists and is unverified, a verification email has been sent.",
-        "success": success,
+        "message": "Email verification has been replaced with OTP authentication. Please use the /auth/send-otp endpoint to receive a login code.",
+        "status": "deprecated",
+        "redirect": "/auth/send-otp"
     }
 
 
-@router.post("/request-password-reset")
-async def request_password_reset(
-    reset_data: UserPasswordReset,
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    """Request password reset email."""
-    
-    # Get request metadata
-    ip_address = get_request_ip(request)
-    metadata = get_request_metadata(request)
-    user_agent = metadata.get("user_agent", "")
-    
-    # Get auth service
-    auth_service = get_auth_service(db)
-    
-    # Request password reset
-    success = await auth_service.request_password_reset(
-        email=reset_data.email,
-        ip_address=ip_address,
-        user_agent=user_agent,
-    )
-    
-    return {
-        "message": "If an account with this email exists, a password reset email has been sent.",
-        "success": success,
-    }
-
-
-@router.post("/reset-password")
-async def reset_password(
-    reset_data: UserPasswordResetConfirm,
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    """Reset password using reset token."""
-    
-    # Get request metadata
-    ip_address = get_request_ip(request)
-    metadata = get_request_metadata(request)
-    user_agent = metadata.get("user_agent", "")
-    
-    # Get auth service
-    auth_service = get_auth_service(db)
-    
-    # Reset password
-    user = await auth_service.reset_password(
-        token=reset_data.token,
-        new_password=reset_data.new_password,
-        ip_address=ip_address,
-        user_agent=user_agent,
-    )
-    
-    return {
-        "message": "Password reset successfully. You can now log in with your new password.",
-        "user_id": str(user.id),
-        "email": user.email,
-    }
-
-
-@router.post("/change-password")
-async def change_password(
-    password_data: dict,  # {"current_password": str, "new_password": str}
-    request: Request,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db),
-):
-    """Change user password (requires authentication)."""
-    
-    # Get request metadata
-    ip_address = get_request_ip(request)
-    metadata = get_request_metadata(request)
-    user_agent = metadata.get("user_agent", "")
-    
-    # Get auth service
-    auth_service = get_auth_service(db)
-    
-    # Change password
-    success = await auth_service.change_password(
-        user=current_user,
-        current_password=password_data.get("current_password"),
-        new_password=password_data.get("new_password"),
-        ip_address=ip_address,
-        user_agent=user_agent,
-    )
-    
-    return {
-        "message": "Password changed successfully.",
-        "success": success,
-    }
+# Password reset and change password functionality removed
+# With OTP authentication, users can simply request a new OTP to regain access
 
 
 @router.get("/me", response_model=User)
@@ -427,7 +252,7 @@ async def get_dashboard_stats(
 ):
     """Get user dashboard statistics."""
     from sqlalchemy import func
-    from app.db.models import Paper, Download, Bookmark
+    from app.models import Paper, Download, Bookmark
     
     # Get user's download count
     downloads_count = db.query(Download).filter(
@@ -449,4 +274,122 @@ async def get_dashboard_stats(
         "downloads": downloads_count,
         "uploads": uploads_count,
         "bookmarks": bookmarks_count,
+    }
+
+
+# Check if user exists with given email
+@router.post("/check-user")
+async def check_user_exists(
+    email_data: dict,  # {"email": str}
+    db: Session = Depends(get_db),
+):
+    """Check if user exists with the provided email."""
+    
+    email = email_data.get("email")
+    if not email:
+        raise HTTPException(
+            status_code=400,
+            detail="Email is required"
+        )
+    
+    # Find user
+    from app.models.user import User as UserModel
+    user = db.query(UserModel).filter(UserModel.email == email).first()
+    
+    return {
+        "exists": user is not None,
+        "email": email,
+    }
+
+
+# OTP-based authentication endpoints
+
+@router.post("/send-otp")
+async def send_otp(
+    email_data: dict,  # {"email": str, "first_name": str, "last_name": str, "is_registration": bool}
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Send OTP to email for login/registration."""
+    
+    # Get request metadata
+    ip_address = get_request_ip(request)
+    
+    # Get OTP service
+    otp_service = get_otp_service(db)
+    
+    # Prepare registration data if provided
+    registration_data = None
+    if email_data.get("is_registration") or email_data.get("first_name") or email_data.get("last_name"):
+        registration_data = {
+            "first_name": email_data.get("first_name"),
+            "last_name": email_data.get("last_name")
+        }
+    
+    # Send OTP
+    success, message = await otp_service.send_login_otp(
+        email=email_data.get("email"),
+        ip_address=ip_address,
+        registration_data=registration_data
+    )
+    
+    if success:
+        return {
+            "message": message,
+            "email": email_data.get("email"),
+        }
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail=message
+        )
+
+
+@router.post("/verify-otp")
+async def verify_otp(
+    otp_data: dict,  # {"email": str, "otp": str}
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Verify OTP and login user."""
+    
+    email = otp_data.get("email")
+    otp_code = otp_data.get("otp")
+    
+    if not email or not otp_code:
+        raise HTTPException(
+            status_code=400,
+            detail="Email and OTP are required"
+        )
+    
+    # Get OTP service
+    otp_service = get_otp_service(db)
+    
+    # Verify OTP
+    success, message, user = otp_service.verify_otp(email, otp_code)
+    
+    if not success:
+        raise HTTPException(
+            status_code=400,
+            detail=message
+        )
+    
+    # Check if this is a new user (first login)
+    is_new_user = user.last_login_at is None or (
+        user.last_login_at and 
+        (datetime.utcnow() - user.last_login_at).total_seconds() < 60
+    )
+    
+    # Create token pair
+    tokens = create_token_pair(str(user.id), user.email)
+    
+    # Prepare user data for response
+    from app.schemas.user import User as UserSchema
+    user_data = UserSchema.from_orm(user)
+    
+    return {
+        **tokens,
+        "user": user_data.dict(),
+        "is_new_user": is_new_user,
+        "message": "Login successful"
     }

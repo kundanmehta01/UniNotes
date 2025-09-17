@@ -188,6 +188,30 @@ class EmailService:
         
         return await self.send_email([email], subject, html_content, text_content)
     
+    async def send_otp_email(self, email: str, otp_code: str, expiry_minutes: int = 10) -> bool:
+        """Send OTP email for login."""
+        
+        subject = f"Your {settings.APP_NAME} Login Code"
+        
+        html_content = self._get_otp_email_template().render(
+            otp_code=otp_code,
+            expiry_minutes=expiry_minutes,
+            app_name=settings.APP_NAME,
+        )
+        
+        text_content = f"""
+        Your {settings.APP_NAME} login code is: {otp_code}
+        
+        This code will expire in {expiry_minutes} minutes.
+        
+        If you didn't request this code, please ignore this email.
+        
+        Best regards,
+        The {settings.APP_NAME} Team
+        """
+        
+        return await self.send_email([email], subject, html_content, text_content)
+    
     def _get_verification_email_template(self):
         """Get email verification template."""
         template_str = '''
@@ -326,6 +350,51 @@ class EmailService:
         <p>If you have any questions or need help, don't hesitate to reach out to our support team.</p>
         
         <p>Happy studying!</p>
+    </div>
+    <div class="footer">
+        <p>&copy; 2024 {{ app_name }}. All rights reserved.</p>
+    </div>
+</body>
+</html>
+        '''
+        return self.jinja_env.from_string(template_str)
+    
+    def _get_otp_email_template(self):
+        """Get OTP email template."""
+        template_str = '''
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Login Code</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #6366f1; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+        .content { background-color: #f8f9fa; padding: 30px; border-radius: 0 0 5px 5px; }
+        .otp-code { background-color: white; border: 2px solid #6366f1; font-size: 32px; font-weight: bold; text-align: center; padding: 20px; margin: 20px 0; border-radius: 8px; letter-spacing: 8px; color: #6366f1; }
+        .footer { text-align: center; margin-top: 30px; font-size: 0.9em; color: #666; }
+        .warning { background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 15px 0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{ app_name }}</h1>
+        <p>Your Login Code</p>
+    </div>
+    <div class="content">
+        <h2>Login to Your Account</h2>
+        <p>Use the code below to complete your login:</p>
+        
+        <div class="otp-code">{{ otp_code }}</div>
+        
+        <div class="warning">
+            <p><strong>Important:</strong> This code will expire in {{ expiry_minutes }} minutes.</p>
+        </div>
+        
+        <p>If you didn't request this login code, please ignore this email and ensure your account is secure.</p>
+        
+        <p><strong>Security tip:</strong> Never share this code with anyone. {{ app_name }} will never ask for this code via phone or email.</p>
     </div>
     <div class="footer">
         <p>&copy; 2024 {{ app_name }}. All rights reserved.</p>

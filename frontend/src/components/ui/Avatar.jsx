@@ -43,12 +43,26 @@ const Avatar = ({
   // Show avatar image if available and no error
   const showImage = user?.avatar_url && !imageError;
   
+  // Get user's display name
+  const displayName = user?.first_name && user?.last_name 
+    ? `${user.first_name} ${user.last_name}` 
+    : user?.full_name || user?.email || 'User';
+    
+  // For initials, prefer email if no names are available
+  const initialsSource = user?.first_name && user?.last_name 
+    ? `${user.first_name} ${user.last_name}`
+    : user?.full_name 
+    ? user.full_name
+    : user?.email 
+    ? user.email.split('@')[0] // Use email username part
+    : 'User';
+  
   return (
     <div className={cn("relative", className)}>
       {showImage ? (
         <img
           src={user.avatar_url}
-          alt={user?.full_name || user?.email || 'User avatar'}
+          alt={`${displayName} avatar`}
           className={cn(
             config.container,
             "rounded-full object-cover",
@@ -66,7 +80,7 @@ const Avatar = ({
             fallbackClassName
           )}
         >
-          {getInitials(user?.full_name || user?.email)}
+          {getInitials(initialsSource)}
         </div>
       )}
     </div>

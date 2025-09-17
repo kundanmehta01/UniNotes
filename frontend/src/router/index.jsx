@@ -5,11 +5,13 @@ import { ProtectedRoute, PublicRoute, AdminRoute, ModeratorRoute } from '../comp
 import Layout from '../components/layout/Layout';
 
 // Auth Pages
+import Auth from '../pages/auth/Auth';
 import Login from '../pages/auth/Login';
 import Register from '../pages/auth/Register';
 import ForgotPassword from '../pages/auth/ForgotPassword';
 import ResetPassword from '../pages/auth/ResetPassword';
 import VerifyEmail from '../pages/auth/VerifyEmail';
+import VerifyOTP from '../pages/auth/VerifyOTP';
 
 // Main Pages
 import Home from '../pages/Home';
@@ -44,8 +46,12 @@ import DebugTestPage from '../routes/admin/DebugTestPage';
 // Static Pages
 import About from '../pages/static/About';
 import Contact from '../pages/static/Contact';
-import Privacy from '../pages/static/Privacy';
-import Terms from '../pages/static/Terms';
+
+// Legal Pages
+import PrivacyPolicy from '../pages/static/PrivacyPolicy';
+import TermsOfService from '../pages/static/TermsOfService';
+import CookiePolicy from '../pages/static/CookiePolicy';
+import Guidelines from '../pages/static/Guidelines';
 
 // Error Pages
 import NotFound from '../pages/NotFound';
@@ -73,11 +79,11 @@ const router = createBrowserRouter([
       },
       {
         path: 'privacy',
-        element: <Privacy />,
+        element: <PrivacyPolicy />,
       },
       {
         path: 'terms',
-        element: <Terms />,
+        element: <TermsOfService />,
       },
       {
         path: 'universities',
@@ -86,6 +92,23 @@ const router = createBrowserRouter([
       {
         path: 'how-it-works',
         element: <HowItWorks />,
+      },
+      // Legal pages
+      {
+        path: 'privacy-policy',
+        element: <PrivacyPolicy />,
+      },
+      {
+        path: 'terms-of-service',
+        element: <TermsOfService />,
+      },
+      {
+        path: 'cookie-policy',
+        element: <CookiePolicy />,
+      },
+      {
+        path: 'guidelines',
+        element: <Guidelines />,
       },
       // Public paper browsing (read-only for non-authenticated users)
       {
@@ -109,6 +132,14 @@ const router = createBrowserRouter([
     path: '/auth',
     element: <Layout showFooter={false} />,
     children: [
+      {
+        index: true,
+        element: (
+          <PublicRoute>
+            <Auth />
+          </PublicRoute>
+        ),
+      },
       {
         path: 'login',
         element: (
@@ -146,6 +177,14 @@ const router = createBrowserRouter([
         element: (
           <PublicRoute>
             <VerifyEmail />
+          </PublicRoute>
+        ),
+      },
+      {
+        path: 'verify-otp',
+        element: (
+          <PublicRoute>
+            <VerifyOTP />
           </PublicRoute>
         ),
       },

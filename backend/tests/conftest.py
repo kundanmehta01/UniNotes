@@ -16,7 +16,7 @@ from app.db.session import get_db
 from app.db.models import Base
 from app.config import get_settings, Settings
 from app.models.user import User, UserRole
-from app.core.security import get_password_hash
+from app.services.security import hash_password
 import uuid
 from datetime import datetime
 
@@ -115,9 +115,7 @@ def test_user(db_session: Session) -> User:
     user = User(
         id=uuid.uuid4(),
         email="testuser@example.com",
-        password_hash=get_password_hash("testpassword123"),
         role=UserRole.STUDENT,
-        is_email_verified=True,
         first_name="Test",
         last_name="User",
         created_at=datetime.utcnow()
@@ -136,9 +134,7 @@ def test_admin_user(db_session: Session) -> User:
     admin_user = User(
         id=uuid.uuid4(),
         email="admin@example.com",
-        password_hash=get_password_hash("adminpassword123"),
         role=UserRole.ADMIN,
-        is_email_verified=True,
         first_name="Admin",
         last_name="User",
         created_at=datetime.utcnow()
@@ -153,32 +149,22 @@ def test_admin_user(db_session: Session) -> User:
 
 @pytest.fixture
 def auth_headers(client: TestClient, test_user: User) -> dict:
-    """Get authentication headers for test user."""
-    login_data = {
-        "username": test_user.email,
-        "password": "testpassword123"
-    }
+    """Get authentication headers for test user (using OTP mock)."""
+    # Since we use OTP auth now, we'll directly create tokens
+    from app.services.security import create_token_pair
     
-    response = client.post("/auth/login", data=login_data)
-    assert response.status_code == 200
-    
-    token_data = response.json()
-    return {"Authorization": f"Bearer {token_data['access_token']}"}
+    tokens = create_token_pair(str(test_user.id), test_user.email)
+    return {"Authorization": f"Bearer {tokens['access_token']}"}
 
 
 @pytest.fixture
 def admin_auth_headers(client: TestClient, test_admin_user: User) -> dict:
-    """Get authentication headers for admin user."""
-    login_data = {
-        "username": test_admin_user.email,
-        "password": "adminpassword123"
-    }
+    """Get authentication headers for admin user (using OTP mock)."""
+    # Since we use OTP auth now, we'll directly create tokens
+    from app.services.security import create_token_pair
     
-    response = client.post("/auth/login", data=login_data)
-    assert response.status_code == 200
-    
-    token_data = response.json()
-    return {"Authorization": f"Bearer {token_data['access_token']}"}
+    tokens = create_token_pair(str(test_admin_user.id), test_admin_user.email)
+    return {"Authorization": f"Bearer {tokens['access_token']}"}
 
 
 @pytest.fixture

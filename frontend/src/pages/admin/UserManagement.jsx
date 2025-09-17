@@ -365,7 +365,6 @@ const UserManagement = () => {
               <option value="created_at">Created Date</option>
               <option value="username">Username</option>
               <option value="email">Email</option>
-              <option value="last_login">Last Login</option>
             </Select>
           </div>
         </div>
@@ -433,9 +432,6 @@ const UserManagement = () => {
                   Joined
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Last Login
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -443,13 +439,13 @@ const UserManagement = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {isLoadingUsers ? (
                 <tr>
-                  <td colSpan="7" className="px-6 py-12 text-center">
+                  <td colSpan="6" className="px-6 py-12 text-center">
                     <Loading />
                   </td>
                 </tr>
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
                     No users found
                   </td>
                 </tr>
@@ -497,9 +493,6 @@ const UserManagement = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {new Date(user.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end space-x-2">
@@ -603,12 +596,7 @@ const UserManagement = () => {
 // Edit User Form Component
 const EditUserForm = ({ user, onSubmit, onCancel }) => {
   const [formData, setFormData] = useState({
-    first_name: user.first_name || '',
-    last_name: user.last_name || '',
-    email: user.email || '',
-    role: user.role || 'student',
-    is_active: user.is_active || false,
-    bio: user.bio || ''
+    is_active: user.is_active || false
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -634,91 +622,90 @@ const EditUserForm = ({ user, onSubmit, onCancel }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            First Name
-          </label>
-          <Input
-            name="first_name"
-            value={formData.first_name}
-            onChange={handleChange}
-            placeholder="Enter first name"
-          />
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {/* User Info Display */}
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <h3 className="text-lg font-medium text-gray-900 mb-2">User Information</h3>
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <span className="font-medium text-gray-700">Name:</span>
+            <span className="ml-2 text-gray-600">
+              {user.first_name && user.last_name 
+                ? `${user.first_name} ${user.last_name}` 
+                : user.email
+              }
+            </span>
+          </div>
+          <div>
+            <span className="font-medium text-gray-700">Email:</span>
+            <span className="ml-2 text-gray-600">{user.email}</span>
+          </div>
+          <div>
+            <span className="font-medium text-gray-700">Role:</span>
+            <span className="ml-2 text-gray-600 capitalize">{user.role}</span>
+          </div>
+          <div>
+            <span className="font-medium text-gray-700">Joined:</span>
+            <span className="ml-2 text-gray-600">
+              {new Date(user.created_at).toLocaleDateString()}
+            </span>
+          </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Last Name
-          </label>
-          <Input
-            name="last_name"
-            value={formData.last_name}
-            onChange={handleChange}
-            placeholder="Enter last name"
-          />
+      </div>
+
+      {/* Account Status Control */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-medium text-gray-900">Account Status</h3>
+        
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="flex items-start space-x-3">
+            <input
+              type="checkbox"
+              name="is_active"
+              id="is_active"
+              checked={formData.is_active}
+              onChange={handleChange}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mt-1"
+            />
+            <div className="flex-1">
+              <label htmlFor="is_active" className="block text-sm font-medium text-gray-700 cursor-pointer">
+                Active Account
+              </label>
+              <p className="text-sm text-gray-500 mt-1">
+                {formData.is_active 
+                  ? "User can log in and access the system"
+                  : "User account is disabled and cannot log in"
+                }
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Status Warning */}
+        <div className={`p-3 rounded-md ${
+          formData.is_active 
+            ? 'bg-green-50 border border-green-200' 
+            : 'bg-yellow-50 border border-yellow-200'
+        }`}>
+          <div className="flex items-center">
+            {formData.is_active ? (
+              <CheckCircle className="h-4 w-4 text-green-600 mr-2" />
+            ) : (
+              <AlertCircle className="h-4 w-4 text-yellow-600 mr-2" />
+            )}
+            <p className={`text-sm ${
+              formData.is_active ? 'text-green-800' : 'text-yellow-800'
+            }`}>
+              {formData.is_active 
+                ? "This user will be able to log in and use all system features."
+                : "This user will be locked out and unable to log in until reactivated."
+              }
+            </p>
+          </div>
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Email
-        </label>
-        <Input
-          name="email"
-          type="email"
-          value={formData.email}
-          onChange={handleChange}
-          placeholder="Enter email address"
-          required
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Role
-        </label>
-        <Select
-          name="role"
-          value={formData.role}
-          onChange={handleChange}
-          required
-        >
-          <option value="student">Student</option>
-          <option value="moderator">Moderator</option>
-          <option value="admin">Admin</option>
-        </Select>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Bio
-        </label>
-        <textarea
-          name="bio"
-          value={formData.bio}
-          onChange={handleChange}
-          placeholder="Enter user bio (optional)"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-          rows={3}
-        />
-      </div>
-
-      <div className="flex items-center">
-        <input
-          type="checkbox"
-          name="is_active"
-          id="is_active"
-          checked={formData.is_active}
-          onChange={handleChange}
-          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-        />
-        <label htmlFor="is_active" className="ml-2 block text-sm text-gray-700">
-          Active user (can login and access the system)
-        </label>
-      </div>
-
-      <div className="flex justify-end space-x-3 pt-4">
+      <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
         <Button
           type="button"
           variant="outline"
@@ -730,8 +717,12 @@ const EditUserForm = ({ user, onSubmit, onCancel }) => {
         <Button
           type="submit"
           disabled={isSubmitting}
+          className={formData.is_active ? 'bg-green-600 hover:bg-green-700' : 'bg-yellow-600 hover:bg-yellow-700'}
         >
-          {isSubmitting ? 'Updating...' : 'Update User'}
+          {isSubmitting 
+            ? 'Updating...' 
+            : (formData.is_active ? 'Activate Account' : 'Deactivate Account')
+          }
         </Button>
       </div>
     </form>

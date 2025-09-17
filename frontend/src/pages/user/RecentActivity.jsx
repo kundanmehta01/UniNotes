@@ -44,7 +44,7 @@ const RecentActivity = () => {
       setPage(1);
       
       // Force immediate fetch with page 1
-      if (user && user.is_email_verified) {
+      if (user) {
         try {
           setLoading(true);
           const response = await activityAPI.getUserActivities({
@@ -86,7 +86,7 @@ const RecentActivity = () => {
   }, []); // Empty dependency array to avoid infinite loop
 
   const fetchActivities = async () => {
-    if (!user || !user.is_email_verified) {
+    if (!user) {
       setLoading(false);
       setError('Please log in to view your activity');
       return;

@@ -1,8 +1,9 @@
-import createPlaceholder from '../../utils/createPlaceholder';
+import React from 'react';
+import { Navigate } from 'react-router-dom';
 
-const Terms = createPlaceholder(
-  'Terms of Service',
-  'This page will contain our terms of service and usage guidelines.'
-);
+// This is a placeholder component that redirects to the comprehensive Terms of Service
+const Terms = () => {
+  return <Navigate to="/terms-of-service" replace />;
+};
 
 export default Terms;

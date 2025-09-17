@@ -59,11 +59,11 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
     
-    # Check if user's email is verified
-    if not user.is_email_verified:
+    # Check if user account is active (can be controlled by admin)
+    if hasattr(user, 'is_active') and not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Email not verified"
+            detail="Account has been deactivated. Please contact support."
         )
     
     return user
@@ -110,7 +110,10 @@ def get_current_user_optional(
             return None
             
         user = db.query(User).filter(User.id == uuid.UUID(user_id)).first()
-        if user and user.is_email_verified:
+        if user:
+            # Check if user is active for optional authentication
+            if hasattr(user, 'is_active') and not user.is_active:
+                return None  # Treat inactive users as not authenticated
             return user
     except (JWTError, ValueError):
         pass

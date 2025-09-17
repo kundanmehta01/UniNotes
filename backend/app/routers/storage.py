@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, status, Request
+from fastapi.responses import Response
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -9,6 +11,18 @@ from app.services.storage import storage_service
 from app.utils.errors import ValidationError
 
 router = APIRouter()
+
+# Add CORS preflight handler for all storage routes
+@router.options("/{path:path}")
+async def handle_cors_preflight(path: str):
+    """Handle CORS preflight requests for all storage endpoints."""
+    response = Response(status_code=200)
+    response.headers["Access-Control-Allow-Origin"] = "http://localhost:5173"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS, DELETE"
+    response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Accept"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Max-Age"] = "3600"
+    return response
 
 
 @router.post("/presign-upload", response_model=dict)
@@ -306,6 +320,10 @@ async def preview_file(
             "Content-Disposition": f"inline; filename={filename}",
             "Cache-Control": "private, max-age=3600",  # Cache for 1 hour
             "X-Content-Type-Options": "nosniff",
+            "Access-Control-Allow-Origin": "http://localhost:5173",  # Vite dev server
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept",
+            "Access-Control-Allow-Credentials": "true",
         }
     )
 
