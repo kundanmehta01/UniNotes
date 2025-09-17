@@ -52,6 +52,55 @@ NOTES_MODEL_SUMMARY.md
 PAPER_APPROVAL_WORKFLOW.md
 
 # ==============================================================================
+# DOCUMENTATION FILES (Development and Project-specific)
+# ==============================================================================
+
+# Project-specific documentation files
+ADMIN_USER_MANAGEMENT_IMPROVEMENTS.md
+AUTHENTICATION_CHANGES.md
+DEPLOYMENT.md
+DOCKER_README.md
+EMAIL_VERIFICATION_REMOVAL_SUMMARY.md
+PROJECT_DOCUMENTATION.md
+README.prod.md
+UPLOAD_SYSTEM_SUMMARY.md
+RATING_SYSTEM_INTEGRATION.md
+PRODUCTION_READINESS_REPORT.md
+UniNotesHub_Documentation.md
+
+# Development documentation patterns
+*_IMPROVEMENTS.md
+*_CHANGES.md
+*_SUMMARY.md
+*_INTEGRATION.md
+*_REPORT.md
+*_WORKFLOW.md
+*_Documentation.md
+CHANGELOG.md
+TODO.md
+NOTES.md
+
+# API documentation (auto-generated)
+api-docs/
+docs/build/
+docs/generated/
+*.swagger.json
+*.openapi.json
+
+# Code documentation
+.jsdoc/
+typedoc/
+sphinx/_build/
+
+# Keep essential documentation
+!README.md
+!LICENSE
+!CONTRIBUTING.md
+!CODE_OF_CONDUCT.md
+!SECURITY.md
+!.github/README.md
+
+# ==============================================================================
 # PROJECT STRUCTURE - Allow main directories
 # ==============================================================================
 # Comment out the overly restrictive ignore pattern
