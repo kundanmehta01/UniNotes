@@ -165,30 +165,15 @@ const useAuthStore = create(
         }
       },
 
+      // Legacy email verification removed - redirect to OTP flow
       verifyEmail: async (token) => {
-        set({ isLoading: true });
-        
-        try {
-          const response = await authAPI.verifyEmail(token);
-          
-          // If user is logged in, refresh their profile to get updated verification status
-          const { isAuthenticated } = get();
-          if (isAuthenticated) {
-            try {
-              const updatedUser = await authAPI.getProfile();
-              set({ user: updatedUser });
-            } catch (profileError) {
-              console.error('Failed to refresh user profile after verification:', profileError);
-            }
-          }
-          
-          set({ isLoading: false });
-          toast.success('Email verified successfully!');
-          return response;
-        } catch (error) {
-          set({ isLoading: false });
-          throw error;
-        }
+        // Email verification is no longer supported - redirect to OTP authentication
+        throw new Error('Email verification has been replaced with OTP authentication. Please use the OTP system to verify your account.');
+      },
+
+      resendVerification: async (email) => {
+        // Email verification is no longer supported - redirect to OTP flow
+        throw new Error('Email verification has been replaced with OTP authentication. Please use the send OTP function instead.');
       },
 
       requestPasswordReset: async (email) => {

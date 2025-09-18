@@ -17,7 +17,6 @@ from app.schemas.user import (
     UserUpdate,
     Token,
     User,
-    EmailVerification,
     TokenRefresh,
 )
 from app.services.auth import get_auth_service
@@ -84,49 +83,8 @@ async def refresh_token(
     return Token(**new_tokens)
 
 
-# Legacy email verification endpoints are deprecated in favor of OTP authentication
-# These endpoints are kept for backward compatibility but will return a redirect message
-
-@router.get("/verify-email")
-async def verify_email_get_deprecated(
-    token: str,
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    """DEPRECATED: Email verification is now handled via OTP."""
-    return {
-        "message": "Email verification has been replaced with OTP authentication. Please use the /auth/send-otp endpoint to receive a login code.",
-        "status": "deprecated",
-        "redirect": "/auth/send-otp"
-    }
-
-
-@router.post("/verify-email")
-async def verify_email_deprecated(
-    verification_data: EmailVerification,
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    """DEPRECATED: Email verification is now handled via OTP."""
-    return {
-        "message": "Email verification has been replaced with OTP authentication. Please use the /auth/send-otp endpoint to receive a login code.",
-        "status": "deprecated",
-        "redirect": "/auth/send-otp"
-    }
-
-
-@router.post("/resend-verification")
-async def resend_verification_deprecated(
-    email_data: dict,  # {"email": str}
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    """DEPRECATED: Email verification is now handled via OTP."""
-    return {
-        "message": "Email verification has been replaced with OTP authentication. Please use the /auth/send-otp endpoint to receive a login code.",
-        "status": "deprecated",
-        "redirect": "/auth/send-otp"
-    }
+# Email verification has been completely removed in favor of OTP authentication
+# All authentication now flows through the OTP system
 
 
 # Password reset and change password functionality removed

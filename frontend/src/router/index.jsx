@@ -10,7 +10,7 @@ import Login from '../pages/auth/Login';
 import Register from '../pages/auth/Register';
 import ForgotPassword from '../pages/auth/ForgotPassword';
 import ResetPassword from '../pages/auth/ResetPassword';
-import VerifyEmail from '../pages/auth/VerifyEmail';
+import VerifyEmail from '../pages/auth/VerifyEmail'; // Deprecated - shows migration notice
 import VerifyOTP from '../pages/auth/VerifyOTP';
 
 // Main Pages

@@ -127,10 +127,7 @@ export const authAPI = {
     return response.data;
   },
   
-  verifyEmail: async (token) => {
-    const response = await api.post(`/auth/verify-email/${token}`);
-    return response.data;
-  },
+  // Email verification removed - now handled via OTP system
   
   requestPasswordReset: async (email) => {
     const response = await api.post('/auth/forgot-password', { email });
